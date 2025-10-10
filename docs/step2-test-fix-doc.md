@@ -128,11 +128,6 @@ which confirmed the fix. The total test failures reduced from 7 to 6, and `testC
 
 
 
-
-
-
-
-
 ### Errors
 There are 2 errors generated which are present in the following file:
 - BookServiceTest: 2 errors were identified.
