@@ -117,8 +117,11 @@ public class TradeController {
         logger.info("Updating trade with id: {}", id);
         try {
             tradeDTO.setTradeId(id); // Ensure the ID matches
-            Trade amendedTrade = tradeService.amendTrade(id, tradeDTO);
-            TradeDTO responseDTO = tradeMapper.toDto(amendedTrade);
+            Trade trade = tradeMapper.toEntity(tradeDTO);
+            trade.setId(id);// Ensure entity has ID for amendment
+            tradeService.populateReferenceDataByName(trade, tradeDTO);
+            Trade savedTrade = tradeService.saveTrade(trade, tradeDTO);
+            TradeDTO responseDTO = tradeMapper.toDto(savedTrade);
             return ResponseEntity.ok(responseDTO);
         } catch (Exception e) {
             logger.error("Error updating trade: {}", e.getMessage(), e);
