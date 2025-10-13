@@ -22,7 +22,7 @@ This section documents all test failures and how each was fixed.
 
 #### i. `testCreateTrade`
 - **Problem Description:**
-The `testCreateTrade` test in TradeController.java failed because it expected a `200 OK` response, but the endpoint returned `201 Created` after successfully creating a trade.
+The `testCreateTrade` test in `TradeControllerTest.java` failed because it expected a `200 OK` response, but the endpoint returned `201 Created` after successfully creating a trade.
 
 - **Root Cause Analysis:**
 According to REST API best practices, a successful resource creation should return `201 Created`, not `200 OK`. The controller implementation in the `createTrade()` method of `TradeController.java` correctly returns `201`, but the test was incorrectly written to expect `200`, resulting in a logical mismatch.
@@ -32,11 +32,11 @@ The test expectation on line **138** in the `testCreateTrade` method was updated
 This ensures consistency between the test and the actual behaviour of the `createTrade()` method.
 
 - **Verification:**
-The test was rerun using the command: 
+The fix was verified by rerunning the previously failing test using: 
 ```
 mvn -Dtest=TradeControllerTest#testCreateTrade test
 ```
-and it passed successfully. Subsequently, a full build was executed with the command, 
+and it passed successfully. Subsequently, a full build was executed with:
 ```
 mvn clean install
 ``` 
@@ -44,7 +44,7 @@ which confirmed the fix. The total test failures reduced from 9 to 8, and `testC
 
 #### ii. `testCreateTradeValidationFailure_MissingBook`
 - **Problem Description:**
-The `testCreateTradeValidationFailure_MissingBook` test in `TradeController.java` failed because it expected a `400 Bad Request` response, but the endpoint returned `201 Created` after creating a trade without a book.
+The `testCreateTradeValidationFailure_MissingBook` test in `TradeControllerTest.java` failed because it expected a `400 Bad Request` response, but the endpoint returned `201 Created` after creating a trade without a book.
 
 - **Root Cause Analysis:**
 In Spring Boot, required fields should be annotated with validation annotations such as `@NotNull`or `@NotBlank`, to ensure they are validated during request binding.
@@ -73,7 +73,7 @@ However, the stricter validation introduced by this fix generated additional iss
 
 #### iii. `testDeleteTrade`
 - **Problem Description:**
-The `testDeleteTrade` test in `TradeController.java` failed because it expected a `204 No Content` response, but the endpoint returned `200 OK` after successfully deleting a trade.
+The `testDeleteTrade` test in `TradeControllerTest.java` failed because it expected a `204 No Content` response, but the endpoint returned `200 OK` after successfully deleting a trade.
 
 - **Root Cause Analysis:**
 According to REST API best practices, a successful resource deletion typically returns `204 No Content` with no response body. 
@@ -96,13 +96,13 @@ and it passed successfully. Subsequently, a full build was executed with the com
 ```
 mvn clean install
 ``` 
-which confirmed the fix. The total test failures reduced from 8 to 7, and `testDeleteTrade` was no longer listed among the failed tests.
+which confirmed the fix. The total test failures reduced from 7 to 6, and `testDeleteTrade` was no longer listed among the failed tests.
 
 
 
 #### iv. `testCreateTradeValidationFailure_MissingTradeDate`
 - **Problem Description:**
-The `testCreateTradeValidationFailure_MissingTradeDate` test in `TradeController.java` failed because it expected the response message, `"Trade date is required"`, but the returned message was an empty string `""`.
+The `testCreateTradeValidationFailure_MissingTradeDate` test in `TradeControllerTest.java` failed because it expected the response message, `"Trade date is required"`, but the returned message was an empty string `""`.
 
 - **Root Cause Analysis:**
 Spring's default validation (`@Valid`) in the controller implementation of `createTrade()` method of `TradeController.java` intercepted the request before this manual validation, throwing a `MethodArgumentNotValidException`. Since this exception was not explicitly handled, the returned body response was empty instead of displaying the expected errror message `"Trade date is required"`. This made explicit exception handling necessary to ensure that the custom message is returned to the client.   
@@ -121,8 +121,92 @@ and it passed successfully. Subsequently, a full build was executed with the com
 ```
 mvn clean install
 ``` 
-which confirmed the fix. The total test failures reduced from 7 to 6, and `testCreateTradeValidationFailure_MissingTradeDate` was no longer listed among the failed tests.
+which confirmed the fix. The total test failures reduced from 6 to 5, and `testCreateTradeValidationFailure_MissingTradeDate` was no longer listed among the failed tests.
 
+#### v. `testUpdateTrade`
+- **Problem Description:**
+The `testUpdateTrade` test in `TradeControllerTest.java` failed because it expected a `tradeId` in the JSON response after updating a trade, but the response body did not contain it.
+
+- **Root Cause Analysis:**
+The `updateTrade()` method in `TradeController.java` was calling `amendTrade()` directly, while the service layer had introduced a new method, `saveTrade()` for controller compatitbility. This `saveTrade()` method internally determines whether to call `createTrade()` or `amendTrade()` based on the presence of a trade ID.
+This caused a logical mismatch between the controller and the test where the test was mocking `saveTrade()`, but the controller was invoking `amendTrade()` directly. 
+As a result, the expected `tradeId` was not returned, since the mocked method did not align with the controller's actual behaviour.
+
+
+- **Solution Implemented:**
+The `updateTrade()` method in `TradeController.java` was refactored to call `saveTrade()` instead of `amendTrade()` to maintain controller-service consistency. 
+This ensures that both the controller and test follow the same execution flow defined by the service layer.
+ Specifically, this part of the `updateTrade()` method was updated:
+  ```
+            tradeDTO.setTradeId(id); // Ensure the ID matches
+            Trade trade = tradeMapper.toEntity(tradeDTO);
+            trade.setId(id);// Ensure entity has ID for amendment
+            tradeService.populateReferenceDataByName(trade, tradeDTO);
+            Trade savedTrade = tradeService.saveTrade(trade, tradeDTO);
+  ```
+This change ensures that the mocked service behaviour in the test aligns with the actual controller flow and that the correct JSON response containing the `tradeId` is returned. 
+
+
+- **Verification:**
+The fix was confirmed by rerunning the previously failing test using: 
+```
+mvn -Dtest=TradeControllerTest#testUpdateTrade test
+```
+and it passed successfully. Subsequently, a full build was executed with: 
+```
+mvn clean install
+``` 
+which confirmed the fix. The total test failures reduced from 5 to 4, and `testUpdateTrade` was no longer listed among the failed tests.
+
+
+#### vi. `testUpdateTradeIdMismatch`
+- **Problem Description:**
+The `testUpdateTradeIdMismatch` test in `TradeControllerTest.java` failed because it expected a `400 Bad Request` response, but the endpoint returned `200 OK` after updating a trade without detecting mismatch between the path variable,`id`, and the `tradeId` in the request body.
+- **Root Cause Analysis:**
+The test is designed to ensure that any discrepancy between the path variable `id` in the `updateTrade` URL and the `tradeId` in the request body triggers a validation error. However, the `updateTrade()` method contained the following line(**119**):
+```
+tradeDTO.setTradeId(id);
+```
+This line executed before any validation occurred, which meant that if a client or test provided mismatched IDs, the controller logic silently overwrote the request body's value with the path variable value. Consequently, input was treated as valid and passed through to the service layer, preventing the expected `400 Bad Request` from being returned. 
+- **Solution Implemented:**
+The controller method, `updateTrade()` was refactored to validate the exactness between the path variable `id` and the `tradeId` in the request body before proceeding with the update. If a mismatch is detected, the method now returns a `400 Bad Request` repsonse with a clear error message.
+The following validation check was added before the update logic:
+```
+ if(tradeDTO.getTradeId() != null && !tradeDTO.getTradeId().equals(id)){
+    return ResponseEntity.badRequest().body("Trade ID in path must match Trade ID in request body")
+ }
+
+```
+This ensures that invalid requests with mismatched IDs now produce the correct HTTP response code and a descriptive error message.
+- **Verification:**
+The fix was verified by rerunning the previously failing test using: 
+```
+mvn -Dtest=TradeControllerTest#testUpdateTradeIdMismatch test
+```
+The test passed successfully, confirming that the controller now returns a `400 Bad Request` when the path and body trade IDs differ. Subsequently, a full build was executed with: 
+```
+mvn clean install
+``` 
+which confirmed the fix. The total test failures reduced from 4 to 3, and `testUpdateTradeIdMismatch` was no longer listed among the failed tests.
+
+### 2. TradeLegControllerTest
+#### i. `testCreateTradeLegValidationFailure_NegativeNotional`
+- **Problem Description:**
+The `testCreateTradeLegValidationFailure_NegativeNotional` test in `TradeLegControllerTest.java` failed because it expected the response message, `"Notional must be positive"` , but the returned message was an empty string `""`.
+- **Root Cause Analysis:**
+Spring's default validation (`@Valid`) in the controller implementation of `createTradeLeg()` method of `TradeLegController.java` intercepted the request before this manual validation, throwing a `MethodArgumentNotValidException`. Since this exception was not explicitly handled, the returned body response was empty instead of displaying the expected errror message `"Notional must be positive"`. This made explicit exception handling necessary to ensure that the custom message is returned to the client.   
+- **Solution Implemented:**
+The global exception handler introduced earlier in fix 2 using the `@ControllerAdvice` and `@ExceptionHandler(MethodArgumentNotValidException.class)` resolved this issue. It ensures that when validation fails, the correct custom error message, `"Notional must be positive"`, is returned in the response. 
+- **Verification:**
+The test was rerun using the command: 
+```
+mvn -Dtest=TradeControllerTest#testCreateTradeLegValidationFailure_NegativeNotional test
+```
+and it passed successfully. Subsequently, a full build was executed with the command, 
+```
+mvn clean install
+``` 
+which confirmed the fix. The total test failures reduced from 3 to 2, and `testCreateTradeLegValidationFailure_NegativeNotional` was no longer listed among the failed tests.
 
 
 
