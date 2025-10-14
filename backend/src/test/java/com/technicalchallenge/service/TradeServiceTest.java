@@ -110,16 +110,31 @@ class TradeServiceTest {
 
     @Test
     void testCreateTrade_InvalidDates_ShouldFail() {
-        // Given - This test is intentionally failing for candidates to fix
-        tradeDTO.setTradeStartDate(LocalDate.of(2025, 1, 10)); // Before trade date
+        //Case 1: Invalid start date
+        // Given
+        tradeDTO.setTradeStartDate(LocalDate.of(2025, 1, 10)); // Invalid - Before trade date
 
         // When & Then
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+        RuntimeException startDateException = assertThrows(RuntimeException.class, () -> {
             tradeService.createTrade(tradeDTO);
         });
 
-        // This assertion is intentionally wrong - candidates need to fix it
-        assertEquals("Wrong error message", exception.getMessage());
+        //Assert
+        assertEquals("Start date cannot be before trade date", startDateException.getMessage());
+
+        //Case 2: Invalid maturity date
+        //Given
+        tradeDTO.setTradeStartDate(LocalDate.of(2025, 1, 17)); //valid start trade date
+        tradeDTO.setTradeMaturityDate(LocalDate.of(2025, 1, 10)); // Invalid - Before start date
+
+        // When & Then
+        RuntimeException maturityDateException = assertThrows(RuntimeException.class, () -> {
+            tradeService.createTrade(tradeDTO);
+        });
+
+        //Assert
+        assertEquals("Maturity date cannot be before start date", maturityDateException.getMessage());
+
     }
 
     @Test
