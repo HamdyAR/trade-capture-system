@@ -92,6 +92,7 @@ class TradeServiceTest {
         trade = new Trade();
         trade.setId(1L);
         trade.setTradeId(100001L);
+        trade.setVersion(1);
     }
 
     @Test
@@ -178,9 +179,13 @@ class TradeServiceTest {
     @Test
     void testAmendTrade_Success() {
         // Given
+        TradeLeg tradeLeg1 = new TradeLeg();
+        tradeLeg1.setLegId(1L);
+
         when(tradeRepository.findByTradeIdAndActiveTrue(100001L)).thenReturn(Optional.of(trade));
         when(tradeStatusRepository.findByTradeStatus("AMENDED")).thenReturn(Optional.of(new com.technicalchallenge.model.TradeStatus()));
         when(tradeRepository.save(any(Trade.class))).thenReturn(trade);
+        when(tradeLegRepository.save(any(TradeLeg.class))).thenReturn(tradeLeg1);
 
         // When
         Trade result = tradeService.amendTrade(100001L, tradeDTO);
