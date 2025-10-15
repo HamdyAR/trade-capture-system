@@ -4,15 +4,16 @@ import com.technicalchallenge.dto.BookDTO;
 import com.technicalchallenge.mapper.BookMapper;
 import com.technicalchallenge.model.Book;
 import com.technicalchallenge.repository.BookRepository;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -21,6 +22,7 @@ public class BookServiceTest {
     private BookRepository bookRepository;
     @Mock
     private BookMapper bookMapper;
+    
     @InjectMocks
     private BookService bookService;
 
@@ -56,13 +58,19 @@ public class BookServiceTest {
 
     @Test
     void testSaveBook() {
+    
         Book book = new Book();
         book.setId(2L);
+
         BookDTO bookDTO = new BookDTO();
         bookDTO.setId(2L);
+
+        when(bookMapper.toEntity(bookDTO)).thenReturn(book);
         when(bookRepository.save(any(Book.class))).thenReturn(book);
+        when(bookMapper.toDto(any(Book.class))).thenReturn(bookDTO);
 
         BookDTO saved = bookService.saveBook(bookDTO);
+
         assertNotNull(saved);
         assertEquals(2L, saved.getId());
     }
