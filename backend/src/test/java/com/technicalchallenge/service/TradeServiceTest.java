@@ -98,7 +98,31 @@ class TradeServiceTest {
     @Test
     void testCreateTrade_Success() {
         // Given
+       Book book = new Book();
+       book.setId(1L);
+       book.setBookName("Book");
+
+       Counterparty counterparty = new Counterparty();
+       counterparty.setId(1L);
+       counterparty.setName("Counterparty");
+
+       TradeStatus status = new TradeStatus();
+       status.setId(1L);
+       status.setTradeStatus("NEW");
+
+       tradeDTO.setBookName(book.getBookName());
+       tradeDTO.setCounterpartyName(counterparty.getName());
+       tradeDTO.setTradeStatus(status.getTradeStatus());
+
+       TradeLeg leg = new TradeLeg();
+       leg.setLegId(101L);
+
+
+        when(bookRepository.findByBookName("Book")).thenReturn(Optional.of(book));
+        when(counterpartyRepository.findByName("Counterparty")).thenReturn(Optional.of(counterparty));
+        when(tradeStatusRepository.findByTradeStatus("NEW")).thenReturn(Optional.of(status));
         when(tradeRepository.save(any(Trade.class))).thenReturn(trade);
+        when(tradeLegRepository.save(any(TradeLeg.class))).thenReturn(leg);
 
         // When
         Trade result = tradeService.createTrade(tradeDTO);
