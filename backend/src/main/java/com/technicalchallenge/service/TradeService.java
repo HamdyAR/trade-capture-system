@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -369,6 +370,10 @@ public class TradeService {
     }
 
     private void createTradeLegsWithCashflows(TradeDTO tradeDTO, Trade savedTrade) {
+        
+        //added code to make cashflow generation test pass
+        List<TradeLeg> legs = new ArrayList<>();
+
         for (int i = 0; i < tradeDTO.getTradeLegs().size(); i++) {
             var legDTO = tradeDTO.getTradeLegs().get(i);
 
@@ -383,12 +388,17 @@ public class TradeService {
             populateLegReferenceData(tradeLeg, legDTO);
 
             TradeLeg savedLeg = tradeLegRepository.save(tradeLeg);
+            
+            //added code to make cashflow generation test pass
+            legs.add(savedLeg);
 
             // Generate cashflows for this leg
             if (tradeDTO.getTradeStartDate() != null && tradeDTO.getTradeMaturityDate() != null) {
                 generateCashflows(savedLeg, tradeDTO.getTradeStartDate(), tradeDTO.getTradeMaturityDate());
             }
         }
+        //added code to make cashflow generation test pass
+        savedTrade.setTradeLegs(legs);
     }
 
     private void populateLegReferenceData(TradeLeg leg, TradeLegDTO legDTO) {
@@ -471,6 +481,10 @@ public class TradeService {
     private void generateCashflows(TradeLeg leg, LocalDate startDate, LocalDate maturityDate) {
         logger.info("Generating cashflows for leg {} from {} to {}", leg.getLegId(), startDate, maturityDate);
 
+        //added code to make cashflow generation test pass
+        ArrayList<Cashflow> cashFlows = new ArrayList<Cashflow>();
+        leg.setCashflows(cashFlows);
+
         // Use default schedule if not set
         String schedule = "3M"; // Default to quarterly
         if (leg.getCalculationPeriodSchedule() != null) {
@@ -496,6 +510,9 @@ public class TradeService {
             cashflow.setActive(true);
 
             cashflowRepository.save(cashflow);
+            
+            //added code to make cashflow generation test pass
+            leg.getCashflows().add(cashflow);
         }
 
         logger.info("Generated {} cashflows for leg {}", paymentDates.size(), leg.getLegId());
