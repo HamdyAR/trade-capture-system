@@ -1,0 +1,484 @@
+# Step 2 Test Fix Documentation
+
+## Overview
+This is a comprehensive documentation of all the failing backend tests that were identified after setting up and running the project successfully. In this documentation, each test case will be analyzed based on the following criteria: 
+- **Problem Description**
+- **Root Cause Analysis**
+- **Solution Implemented**
+- **Verification** 
+
+The aim of this documentation is to provide a clear understsnding of the causes of test failures and errors, the reasoning behind each fix, and the verification process that ensures that all the issues were properly resolved.
+
+## Summary of Test Results
+After running `mvn clean install`, a total of **11 failing test cases** were identified. These test cases are grouped into two main categories:
+- **Failures**: Tests that executed but failed due to incorrect logic (9 total).
+- **Errors**: Tests that could not execute successfully due to thrown exceptions (2 total).
+
+
+## Test Failures
+This section documents all **9** test failures and how each was fixed.
+### 1. TradeControllerTest
+**Total Failures: 6**
+
+#### i. `testCreateTrade`
+- **Problem Description:**
+The `testCreateTrade` test in `TradeControllerTest.java` failed because it expected a `200 OK` response, but the endpoint returned `201 Created` after successfully creating a trade.
+
+- **Root Cause Analysis:**
+According to REST API best practices, a successful resource creation should return `201 Created`, not `200 OK`. The controller implementation in the `createTrade()` method of `TradeController.java` correctly returns `201`, but the test was incorrectly written to expect `200`, resulting in a logical mismatch.
+
+- **Solution Implemented:**
+The test expectation on line **138** in the `testCreateTrade` method was updated from `.andExpect(status().isOk())` to `andExpect(status().isCreated())`.
+This ensures consistency between the test and the actual behaviour of the `createTrade()` method.
+
+- **Verification:**
+The fix was verified by rerunning the previously failing test using: 
+```
+mvn -Dtest=TradeControllerTest#testCreateTrade test
+```
+and it passed successfully. Subsequently, a full build was executed with:
+```
+mvn clean install
+``` 
+which confirmed the fix. The total test failures reduced from 9 to 8, and `testCreateTrade` was no longer listed among the failed tests.
+
+#### ii. `testCreateTradeValidationFailure_MissingBook`
+- **Problem Description:**
+The `testCreateTradeValidationFailure_MissingBook` test in `TradeControllerTest.java` failed because it expected a `400 Bad Request` response, but the endpoint returned `201 Created` after creating a trade without a book.
+
+- **Root Cause Analysis:**
+In Spring Boot, required fields should be annotated with validation annotations such as `@NotNull`or `@NotBlank`, to ensure they are validated during request binding.
+The `bookName` field in `TradeDTO.java` (around line **47**) did not have a `@NotNull` annotation. As a result, Spring Boot did not perform validation on this field, and the controller proceeded to create the trade without verifying the book data, returning `201 Created` instead of the expected `400 Bad Request` indicating invalid request data.
+
+To correct this, a manual validation check was added inside `createTrade()` to ensure both `bookName` and `counterpartyName` are provided. This correctly triggered the `400 Bad Request` response. 
+However, another issue arose because Spring's default validation (`@Valid`) intercepted the request before this manual validation, throwing a `MethodArgumentNotValidException`. Since this exception was not explicitly handled, the returned body response was empty instead of displaying the expected errror message `"Book and Counterparty are required"`.This required explicit exception handling to ensure that the custom message was returned to the client.   
+
+
+- **Solution Implemented:**
+A global exception handler was implemented using the `ControllerAdvice` and `ExceptionHandler(MethodArgumentNotValidException.class)` annotations to catch validation errors amd return meaningful error messages. This ensures that the custom message, `"Book and Counterparty are required"` is returned whenever either the `bookName` or `counterpartyName` fields is missing from the trade request. 
+
+- **Verification:**
+The test was rerun using the command: 
+```
+mvn -Dtest=TradeControllerTest#testCreateTradeValidationFailure_MissingBook test
+```
+and it passed successfully. Subsequently, a full build was executed with the command, 
+```
+mvn clean install
+``` 
+which confirmed the fix. The total test failures reduced from 8 to 7, and `testCreateTradeValidationFailure_MissingBook` was no longer listed among the failed tests.
+
+However, the stricter validation introduced by this fix generated additional issues in other test cases(`BookServiceTest` and `TradeServiceTest`), which were previously masked by the missing validation. These new errors will be analyzed and addressed in subsequent fixes.
+
+
+#### iii. `testDeleteTrade`
+- **Problem Description:**
+The `testDeleteTrade` test in `TradeControllerTest.java` failed because it expected a `204 No Content` response, but the endpoint returned `200 OK` after successfully deleting a trade.
+
+- **Root Cause Analysis:**
+According to REST API best practices, a successful resource deletion typically returns `204 No Content` with no response body. 
+However, in this project, the `deleteTrade()` method in `TradeController.java` is intentionally designed to return a message body for frontend display purposes. This makes the use of `200 OK` more appropriate, as it allows a confirmation message to be sent in the response.
+The test, however, was still expecting `204 No Content`, creating a logical mismatch between the test expectation and the controller's behaviour.
+Additionally, the response message `"Trade cancelled successfully"` was misleading, as the actual operation being performed is a deletion, not cancellation.
+
+
+- **Solution Implemented:**
+The expected status on line **223** in the test was updated from `.andExpect(status().isNoContent())` to `.andExpect(status().isOk())` to reflect the actual API behaviour. The controller's response message was updated from `ResponseEntity.ok().body("Trade cancelled successfully")` to  
+`ResponseEntity.ok().body("Trade deleted successfully")` on line **144** ensuring the response message accurately describes the action performed. These changes align both the controller logic and the test expectations for consistency.
+
+
+- **Verification:**
+The test was rerun using the command: 
+```
+mvn -Dtest=TradeControllerTest#testDeleteTrade test
+```
+and it passed successfully. Subsequently, a full build was executed with the command, 
+```
+mvn clean install
+``` 
+which confirmed the fix. The total test failures reduced from 7 to 6, and `testDeleteTrade` was no longer listed among the failed tests.
+
+
+
+#### iv. `testCreateTradeValidationFailure_MissingTradeDate`
+- **Problem Description:**
+The `testCreateTradeValidationFailure_MissingTradeDate` test in `TradeControllerTest.java` failed because it expected the response message, `"Trade date is required"`, but the returned message was an empty string `""`.
+
+- **Root Cause Analysis:**
+Spring's default validation (`@Valid`) in the controller implementation of `createTrade()` method of `TradeController.java` intercepted the request before this manual validation, throwing a `MethodArgumentNotValidException`. Since this exception was not explicitly handled, the returned body response was empty instead of displaying the expected errror message `"Trade date is required"`. This made explicit exception handling necessary to ensure that the custom message is returned to the client.   
+
+
+- **Solution Implemented:**
+The global exception handler introduced earlier using the `@ControllerAdvice` and `@ExceptionHandler(MethodArgumentNotValidException.class)` resolved this issue. It ensures that when validation fails, the correct custom error message, `"Trade date is required"`, is returned in the response. 
+
+
+- **Verification:**
+The test was rerun using the command: 
+```
+mvn -Dtest=TradeControllerTest#testCreateTradeValidationFailure_MissingTradeDate test
+```
+and it passed successfully. Subsequently, a full build was executed with the command, 
+```
+mvn clean install
+``` 
+which confirmed the fix. The total test failures reduced from 6 to 5, and `testCreateTradeValidationFailure_MissingTradeDate` was no longer listed among the failed tests.
+
+#### v. `testUpdateTrade`
+- **Problem Description:**
+The `testUpdateTrade` test in `TradeControllerTest.java` failed because it expected a `tradeId` in the JSON response after updating a trade, but the response body did not contain it.
+
+- **Root Cause Analysis:**
+The `updateTrade()` method in `TradeController.java` was calling `amendTrade()` directly, while the service layer had introduced a new method, `saveTrade()` for controller compatitbility. This `saveTrade()` method internally determines whether to call `createTrade()` or `amendTrade()` based on the presence of a trade ID.
+This caused a logical mismatch between the controller and the test where the test was mocking `saveTrade()`, but the controller was invoking `amendTrade()` directly. 
+As a result, the expected `tradeId` was not returned, since the mocked method did not align with the controller's actual behaviour.
+
+
+- **Solution Implemented:**
+The `updateTrade()` method in `TradeController.java` was refactored to call `saveTrade()` instead of `amendTrade()` to maintain controller-service consistency. 
+This ensures that both the controller and test follow the same execution flow defined by the service layer.
+ Specifically, this part of the `updateTrade()` method was updated:
+  ```
+            tradeDTO.setTradeId(id); // Ensure the ID matches
+            Trade trade = tradeMapper.toEntity(tradeDTO);
+            trade.setId(id);// Ensure entity has ID for amendment
+            tradeService.populateReferenceDataByName(trade, tradeDTO);
+            Trade savedTrade = tradeService.saveTrade(trade, tradeDTO);
+  ```
+This change ensures that the mocked service behaviour in the test aligns with the actual controller flow and that the correct JSON response containing the `tradeId` is returned. 
+
+
+- **Verification:**
+The fix was confirmed by rerunning the previously failing test using: 
+```
+mvn -Dtest=TradeControllerTest#testUpdateTrade test
+```
+and it passed successfully. Subsequently, a full build was executed with: 
+```
+mvn clean install
+``` 
+which confirmed the fix. The total test failures reduced from 5 to 4, and `testUpdateTrade` was no longer listed among the failed tests.
+
+
+#### vi. `testUpdateTradeIdMismatch`
+- **Problem Description:**
+The `testUpdateTradeIdMismatch` test in `TradeControllerTest.java` failed because it expected a `400 Bad Request` response, but the endpoint returned `200 OK` after updating a trade without detecting mismatch between the path variable,`id`, and the `tradeId` in the request body.
+- **Root Cause Analysis:**
+The test is designed to ensure that any discrepancy between the path variable `id` in the `updateTrade` URL and the `tradeId` in the request body triggers a validation error. However, the `updateTrade()` method contained the following line(**119**):
+```
+tradeDTO.setTradeId(id);
+```
+This line executed before any validation occurred, which meant that if a client or test provided mismatched IDs, the controller logic silently overwrote the request body's value with the path variable value. Consequently, input was treated as valid and passed through to the service layer, preventing the expected `400 Bad Request` from being returned. 
+- **Solution Implemented:**
+The controller method, `updateTrade()` was refactored to validate the exactness between the path variable `id` and the `tradeId` in the request body before proceeding with the update. If a mismatch is detected, the method now returns a `400 Bad Request` repsonse with a clear error message.
+The following validation check was added before the update logic:
+```
+ if(tradeDTO.getTradeId() != null && !tradeDTO.getTradeId().equals(id)){
+    return ResponseEntity.badRequest().body("Trade ID in path must match Trade ID in request body")
+ }
+
+```
+This ensures that invalid requests with mismatched IDs now produce the correct HTTP response code and a descriptive error message.
+- **Verification:**
+The fix was verified by rerunning the previously failing test using: 
+```
+mvn -Dtest=TradeControllerTest#testUpdateTradeIdMismatch test
+```
+The test passed successfully, confirming that the controller now returns a `400 Bad Request` when the path and body trade IDs differ. Subsequently, a full build was executed with: 
+```
+mvn clean install
+``` 
+which confirmed the fix. The total test failures reduced from 4 to 3, and `testUpdateTradeIdMismatch` was no longer listed among the failed tests.
+
+### 2. TradeLegControllerTest
+**Total Failures: 1**
+#### i. `testCreateTradeLegValidationFailure_NegativeNotional`
+- **Problem Description:**
+The `testCreateTradeLegValidationFailure_NegativeNotional` test in `TradeLegControllerTest.java` failed because it expected the response message, `"Notional must be positive"` , but the returned message was an empty string `""`.
+- **Root Cause Analysis:**
+Spring's default validation (`@Valid`) in the controller implementation of `createTradeLeg()` method of `TradeLegController.java` intercepted the request before this manual validation, throwing a `MethodArgumentNotValidException`. Since this exception was not explicitly handled, the returned body response was empty instead of displaying the expected errror message `"Notional must be positive"`. This made explicit exception handling necessary to ensure that the custom message is returned to the client.   
+- **Solution Implemented:**
+The global exception handler introduced earlier in fix 2 using the `@ControllerAdvice` and `@ExceptionHandler(MethodArgumentNotValidException.class)` resolved this issue. It ensures that when validation fails, the correct custom error message, `"Notional must be positive"`, is returned in the response. 
+- **Verification:**
+The test was rerun using the command: 
+```
+mvn -Dtest=TradeLegControllerTest#testCreateTradeLegValidationFailure_NegativeNotional test
+```
+and it passed successfully. Subsequently, a full build was executed with the command, 
+```
+mvn clean install
+``` 
+which confirmed the fix. The total test failures reduced from 3 to 2, and `testCreateTradeLegValidationFailure_NegativeNotional` was no longer listed among the failed tests.
+
+
+### 3. TradeServiceTest
+**Total Failures: 2**
+#### i. `testCashflowGeneration_MonthlySchedule`
+- **Problem Description:**
+The `testCashflowGeneration_MonthlySchedule` test in `TradeServiceTest.java` was initially incomplete and failed due to a placeholder assertion and missing dependencies. The test had no valid reference data setup, no call to the cashflow generation method, and contained a hardcoded failing assertion,`assertEquals(1, 12)`, which caused it to always fail.  
+
+- **Root Cause Analysis:**
+The cashflow generation method, `generateCashflows()` in `TradeService.java` is private. To call it, the `TradeService.createTrade()` method has to be invoked. However, `createTrade()` depends on several reference data repositories(`BookRepository`, `CounterpartyRepository`,`TradeStatusRepository` and `ScheduleRepository`) to populate and validate a trade before generating cashflows.
+These dependencies were not mocked in the original test, and the trade was never configured with relevant reference data. Similarly, the trade legs were missing a valid schedule. Consequently, the test threw runtime exceptions like:
+```
+Runtime Exception: Book not found or not set
+```
+Additionally, the cashflow generation logic did not attach genrated cashflows to the trade legs,leaving the test logically incomplete and causing null pointer exceptions in assertions.
+- **Solution Implemented:**
+The `testCashflowGeneration_MonthlySchedule` test was fully implemented and refactored, and the service logic was slightly enhaced to make it testable:
+- 1. **Test Changes:**
+   - Created and configured valid `TradeDTO`, `TradeLegDTO`  and reference data 
+      (Book, Counterparty, TradeStatus and Schedule) objects.
+   - Assigned a monthly schedule `("1M")` to both trade leg DTOs.
+   - Mocked all necessary repository lookups used during 
+      `populateReferenceDataByName()` and `populateLegReferenceData()` execution.
+   - Called `tradeService.createTrade()` to trigger actual cashflow generation. 
+   - Asserted that each trade leg of the created trade had 12 cashflows each for a monthly schedule.
+
+- 2. **Service changes:**
+   - In `TradeService.generateCashflows()`, after creating each `Cashflow` and saving it, this was added:
+   ```
+   leg.getCashflows().add(cashflow);
+   ```
+   to ensure that each `TradeLeg` object holds all generated cashflows, allowing the test to assert their count.
+   - In `TradeService.createTradeLegsWithCashflows()`, after saving the trade legs and generating their corresponding cashflows, this was added:
+   ```
+   savedTrade.setTradeLegs(legs);
+   ```  
+   to ensure that the saved trade returned by the service has the populated trade legs, enabling assertions on cashflows.
+
+- **Verification:**
+The fix was verified by rerunning the test using:
+```
+mvn -Dtest=TradeServiceTest#testCashflowGeneration_MonthlySchedule test
+```
+The test passed successfully, confirming correct monthly cashflow generation.
+Subsequently, a full build was executed with:
+```
+mvn clean install
+```
+which confirmed the fix. `testCashflowGeneration_MonthlySchedule` was no longer listed among the failing tests and the total test failure count reduced from 2 to 1.
+
+
+#### ii. `testCreateTrade_InvalidDates_ShouldFail`
+- **Problem Description:**
+The `testCreateTrade_InvalidDates_ShouldFail` test in `TradeServiceTest.java` failed because it expected the error message, `"Wrong error message"` but the actual message returned by the service was `"Start date cannot be before trade date"`
+- **Root Cause Analysis:**
+The test contained a placeholder assertion that did not match the actual validation message produced by the `TradeService.createTrade()` method. The method correctly throws an exception when the start date is earlier than the trade date, but the test had not been updated to reflect the intended validation rule.
+- **Solution Implemented:**
+The assertion in test was updated to match the actual expected validation message:
+```
+assertEquals("Start date cannot be before trade date", startDateException.getMessage());
+```
+Additionally, a change was made to the test logic to improve the date validation for both start date and maturity dates, which enforces the business rule. The check for maturity date was introduced to the test as follows:
+```
+assertEquals("Maturity date cannot be before start date", maturityDateException.getMessage());
+```
+- **Verification:**
+The test was rerun using:
+```
+mvn -Dtest=TradeServiceTest#testCreateTrade_InvalidDates_ShouldFail test
+```
+The test now passes successfully, confirming correct date validation behaviour.
+
+The overall build was verified using:
+```
+mvn clean install
+```
+The total test failure count reduced from 1 to 0 indicating that all the test failures have been resolved successfully including `testCreateTrade_InvalidDates_ShouldFail`.
+
+
+## Errors
+This section documents all **2** test errors identified from running the first build, and **3** test errors that arose after fixing some test failures earlier, and how each was fixed.
+**Total errors: 5**
+### 1. BookServiceTest
+**Total errors from first build: 2**
+#### i. `testFindBookById`
+- **Problem Description:**
+The `testFindBookById` test in `BookServiceTest.java` failed with a `NullPointerException` at line **29** when calling the `getBookById()` method in `BookService.java`.
+- **Root Cause Analysis:**
+Inside `BookService.getBookById()` on line **37**, the method:
+```
+return bookRepository.findById(id).map(bookMapper::toDto);
+```
+uses `bookMapper` to convert a Book entity to a DTO.
+In the test, while the `bookRepository` was properly mocked, `bookMapper` was never mocked, leading to a null reference when the method tried to call `bookMapper.toDto()`.
+
+- **Solution Implemented:**
+The test was refactored to:
+   - Create a valid BookDTO mock object:
+     ```
+        BookDTO bookDTO = new BookDTO();
+        bookDTO.setId(1L);
+        bookDTO.setBookName("Book1");
+     ```
+   - Mock bookMapper behaviour:
+     ```
+     when(bookMapper.toDto(book)).thenReturn((bookDTO));
+     ```
+   - Add extra assertion to validate results:
+     ```
+     assertEquals("Book1", found.get().getBookName());
+     ```
+   - Verify mock interactions:
+     ```
+     verify(bookRepository).findById(1L);
+     verify(bookMapper).toDto(book);
+     ``` 
+This ensures that all dependencies are properly mocked and tested through the service layer.   
+   
+- **Verification:**
+The fix was verified by rerunning the test:
+```
+mvn -Dtest=BookServiceTest#testFindBookById test
+```
+The test passed successfully, confirming that the `bookMapper` was correctly injected and mocked.
+A full build was also executed using:
+```
+mvn clean install
+```
+where the total test error count reduced from 5 to 4, confirming no new test failures were introduced.
+
+#### ii. `testFindBookByNonExistentId`
+- **Problem Description:**
+The `testFindBookByNonExistentId` test in `BookServiceTest.java` failed with a `NullPointerException`. The test expected an empty `Optional` when no book was found, but the service threw an exception.
+- **Root Cause Analysis:**
+The `BookService.getBookById()` method uses:
+```
+return bookRepository.findById(id).map(bookMapper::toDto);
+```
+The `bookMapper` was not mocked in the test so mapping resulted in a null reference hence triggering the `NullPointerException`.
+- **Solution Implemented:**
+The earlier fix for `testFindBookById` included properly mocking `bookMapper.toDto()`. With that setup, the service now safely returns `Optional.empty()` safley for non-existent IDs. No additional changes were required for this test.
+- **Verification:**
+Rerunning the test using:
+```
+mvn -Dtest=BookServiceTest#testFindBookBNonExistentId test
+```
+confirms the test passes, and `BookService.getBookById()` safely handles non-existent books. A full build (`mvn clean install`) shows no new failures and the total error count reduced from 4 to 3.
+
+#### iii. `testSaveBook`
+- **Problem Description:**
+The `testSaveBook` test was failing with a `NullPointerException`:
+```
+NullPointer Cannot invoke "com.technicalchallenge.mapper.BookMapper.toEntity(com.technicalchallenge.dto.BookDTO)" because "<local3>.bookMapper" is null
+```
+This occurred when attempting to call `bookService.save(bookDTO)`.
+- **Root Cause Analysis:**
+The `BookService.saveBook()` method internally calls:
+```
+Book book = bookMapper.toEntity(bookDTO);
+```
+However, in the test setup, the `bookMapper` dependency was not mocked. As a result, `bookMapper` was null during execution, leading to a `NullPointerException`.
+- **Solution Implemented:**
+The fix involved properly mocking the `bookMapper` interactions within the test:
+```
+when(bookMapper.toEntity(bookDTO)).thenReturn(book);
+when(bookMapper.toDTO(savedBook)).thenReturn(savedBookDTO);
+```
+This ensures that the service can convert entity and DTO without encountering null references.
+- **Verification:**
+The fix was verified by running:
+```
+mvn -Dtest=BookServiceTest#testSaveBook test
+```
+The test passed successfully. A successful full build `mvn clean install` confirmed that the `NullPointerException` no longer occurs and no new test failures were introduced. All the total error count reduced from 3 to 2.
+
+
+
+### 2. TradeServiceTest
+**Total errors: 3**
+#### i. `testAmendTrade_Success`
+- **Problem Description:**
+The `testAmendTrade_Success` test failed with a `NullPointerException`:
+```
+NullPointer Cannot invoke "java.lang.Integer.intValue()" because the return value of "com.technicalchallenge.model.Trade.getVersion()" is null
+```
+This occurred during the execution of `amendedTrade.setVersion(existingTrade.getVersion() + 1);` on line **279** of the `amendTrade()` method in `TradeService.java`.
+- **Root Cause Analysis:**
+The `amendTrade()` method follow these steps when ammending a trade:
+   - 1.  Find the existing trade by its `tradeId`
+   - 2.  Deactivate the existing trade (set `active` to `false` and record the deactivated date)
+   - 3.  Save the deactivated trade
+   - 4.  Create a new version of the trade by incrementing the version by 1.
+   - 5.  Set the trade status to "AMENDED"
+   - 6.  Save the amended trade
+   - 7.  Create new trade legs and generate corresponding cashflows 
+The failure occurred at `step 4` because the test setup created a trade without a version. As a result, `getVersion()` returned null, and the call to increment it(`+ 1`) triggered a `NullPointerException`.  
+After fixing this, a second error occurred:
+```
+NullPointer Cannot invoke "com.technicalchallenge.model.TradeLeg.getLegId()" because "leg" is null
+```
+This happened at line **472** in the `generateCashflows()` method of `TradeService.java`:
+```
+logger.info("Generating cashflows for leg {} from {} to {}", leg.getLegId(), startDate, maturityDate);
+```
+The test had not mocked the `TradeLegRepository` to create trade legs with assigned IDs, leading to a null `leg` reference during cashflow generation. 
+- **Solution Implemented:**
+The test was updated as follows:
+  -  Set `trade.setVersion(1)` to initialize the version for new trades in the test setup.
+  -  Mocked the `TradeLegRepository` to return the saved `TradeLeg` object when saving. 
+These changes ensured that the trade version was set and trade legs were correctly generated with valid IDs.
+- **Verification:**
+The fix was verified by running:
+```
+mvn -Dtest=TradeServiceTest#testAmendTrade_Success test
+```
+The test passed successfully. 
+A full build (`mvn clean install`) confirmed the fix, with no new test failures were introduced. 
+The total error count decreased from 2 to 1, confirming the resolution of the `NullPointerException`.
+
+#### ii. `testCreateTrade_Success`
+- **Problem Description:**
+The `testCreateTrade_Success` test in `TradeServiceTest.java` initially failed with two sequential errors during execution of `tradeService.createTrade(tradeDTO)`:
+   1.
+      ```
+      Runtime Book not found or not set
+      ```
+   This occurred because the service could not resolve the required reference data(`Book`, `Counterparty`, `TradeStatus`) when populating the trade.   
+   2.
+      ```
+      NullPointer Cannot invoke "com.technicalchallenge.model.TradeLeg.getLegId()" because "leg" is null
+      ```
+   This happened after resolving the first issue, when generating cashflows for trade legs, the service expected valid `TradeLeg`s with assigned IDs, but the mocked repository returned null.
+- **Root Cause Analysis:**
+The first failure (`Book not found or set`) occurred because the test setup did not mock the reference data repositories used inside `populateReferenceDataByName()`.
+The second failure (`NullPointerException`) occurred because `tradeLegRepository.save(any(TradeLeg.class)` was not mocked to return valid `TradeLeg`s.
+Consequently, the service received a `null` `TradeLeg` and crashed when trying to access its `legId` during cashflow generation.
+- **Solution Implemented:**
+The test setup was enhanced to fully prepare valid and consistent data for the service:
+   - Created valid `Book`, `Counterparty`, and `TradeStatus` entities, and configured the `tradeDTO` with their corresponding names.
+   - Mocked repository lookups:
+     ```
+      when(bookRepository.findByBookName(any(String.class))).thenReturn(Optional.of(new Book()));
+      when(counterpartyRepository.findByName(any(String.class))).thenReturn(Optional.of(new Counterparty()));
+      when(tradeStatusRepository.findByTradeStatus(any(String.class))).thenReturn(Optional.of(new TradeStatus()));
+     ```
+   - Mocked the `TradeLegRepository` to produce valid `TradeLeg`s attached to the created trade:
+      ```
+      when(tradeLegRepository.save(any(TradeLeg.class))).thenAnswer(invocation -> invocation.getArgument(0));
+      ```  
+These updates ensured all dependencies required by `TradeService.createTrade()` were properly satisfied, preventing both runtime and null pointer exceptions.      
+- **Verification:**
+The fix was verified by executing:
+```
+mvn -Dtest=TradeServiceTest#testCreateTrade_Success test
+```
+The test passed successfully. 
+A full build (`mvn clean install`) confirmed no new test failures. 
+The total number of errors decreased from 1 to 0 as both exceptions were fully resolved.
+
+
+## Conclusion
+After successfully fixing all the test failures and errors, the `TradeServiceTest` class was refactored to improve maintainability and adhere to the `DRY(Don't Repeat Yourself)` software engineering principle.
+
+During debugging, it was observed that several repository mocks were repeatedly created  in `testCreateTrade_Success` and `testCashflowGeneration_MonthlySchedule`. These included mocks for:
+   - BookRepository,
+   - CounterpartyRepository
+   - TradeStatusRepository 
+   - TradeRepository
+   - TradeLegRepository 
+
+To eliminate this redundancy, a helper method named `createTradeMocks()` was introduced. This method covers the setup of common mocks. By calling this method within both tests, it eliminated duplicate setup code, simplified the test structure and improved overall readability.
+
+This marks the successful completion of Step 2 of the project. All test failures and errors were resolved and the test suites now run successfully.
+

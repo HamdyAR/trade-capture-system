@@ -1,45 +1,76 @@
 package com.technicalchallenge.service;
 
 import com.technicalchallenge.dto.BookDTO;
+import com.technicalchallenge.mapper.BookMapper;
 import com.technicalchallenge.model.Book;
 import com.technicalchallenge.repository.BookRepository;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class BookServiceTest {
     @Mock
     private BookRepository bookRepository;
+    @Mock
+    private BookMapper bookMapper;
+    
     @InjectMocks
     private BookService bookService;
 
     @Test
     void testFindBookById() {
+        //Given
+        //creating Book mock object
         Book book = new Book();
         book.setId(1L);
+        book.setBookName("Book1");
+
+        //creating BookDTO mock object
+        BookDTO bookDTO = new BookDTO();
+        bookDTO.setId(1L);
+        bookDTO.setBookName("Book1");
+
+        //mocking bookRepository and bookMapper behaviour
         when(bookRepository.findById(1L)).thenReturn(Optional.of(book));
+        when(bookMapper.toDto(book)).thenReturn((bookDTO));
+        
+        //calling BookService method
         Optional<BookDTO> found = bookService.getBookById(1L);
+
+        //validating results
         assertTrue(found.isPresent());
         assertEquals(1L, found.get().getId());
+        assertEquals("Book1", found.get().getBookName());
+
+        //verifying mock interactions
+        verify(bookRepository).findById(1L);
+        verify(bookMapper).toDto(book);
     }
 
     @Test
     void testSaveBook() {
+    
         Book book = new Book();
         book.setId(2L);
+
         BookDTO bookDTO = new BookDTO();
         bookDTO.setId(2L);
+
+        when(bookMapper.toEntity(bookDTO)).thenReturn(book);
         when(bookRepository.save(any(Book.class))).thenReturn(book);
+        when(bookMapper.toDto(any(Book.class))).thenReturn(bookDTO);
 
         BookDTO saved = bookService.saveBook(bookDTO);
+
         assertNotNull(saved);
         assertEquals(2L, saved.getId());
     }

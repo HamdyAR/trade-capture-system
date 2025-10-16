@@ -44,6 +44,7 @@ public class TradeDTO {
 
     // Book reference
     private Long bookId;
+    @NotNull(message = "Book name is required")
     private String bookName;
 
     // Counterparty reference

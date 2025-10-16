@@ -52,9 +52,10 @@ public class BookService {
         logger.info("Saving book: {}", dto.toString());
         var entity = bookMapper.toEntity(dto);
         logger.debug("Saving book Entity: {}", entity);
+        
         populateReferenceDataByName(entity, dto);
+        
         var saved = bookRepository.save(entity);
-
         return bookMapper.toDto(saved);
     }
 
