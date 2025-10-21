@@ -2,9 +2,11 @@ package com.technicalchallenge.service;
 
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeLegDTO;
+import com.technicalchallenge.dto.TradeSearchDTO;
 import com.technicalchallenge.model.*;
 import com.technicalchallenge.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
@@ -605,4 +607,68 @@ public class TradeService {
         // For simplicity, using a static variable. In real scenario, this should be atomic and thread-safe.
         return 10000L + tradeRepository.count();
     }
+
+    
+
+    //New method of searching trades
+    public List<Trade> searchTrade(TradeSearchDTO searchDTO){
+        logger.info("Searching all trades satisfying criteria, {}", searchDTO);
+
+        validateDateRange(searchDTO);
+
+        Specification<Trade> spec = buildTradeSearchSpecification(searchDTO);
+        List<Trade> result = tradeRepository.findAll(spec);
+
+        logger.info("Found {} trades matching search criteria, {}", result.size());
+
+        return result;
+    }
+
+    private Specification<Trade> buildTradeSearchSpecification(TradeSearchDTO searchDTO){
+        Specification<Trade> spec = Specification.where((root, query, cb) -> cb.conjunction());
+        
+        if (searchDTO.getCounterparty() != null && !searchDTO.getCounterparty().isEmpty()){
+            spec = spec.and((root, query, cb) -> 
+                cb.equal(cb.lower(root.get("counterparty").get("name")), searchDTO.getCounterparty().toLowerCase())
+            );
+        }
+
+        if (searchDTO.getBook() != null && !searchDTO.getBook().isEmpty()){
+            spec = spec.and((root, query, cb) -> 
+                cb.equal(cb.lower(root.get("book").get("name")), searchDTO.getBook().toLowerCase())
+            );
+        }
+
+        if (searchDTO.getTrader() != null && !searchDTO.getTrader().isEmpty()){
+            spec = spec.and((root, query, cb) ->
+                cb.or(
+                    cb.equal(cb.lower(root.get("traderUser").get("firstName")), searchDTO.getTrader().toLowerCase()),
+                    cb.equal(cb.lower(root.get("traderUser").get("lastName")), searchDTO.getTrader().toLowerCase())   
+                ));
+        }
+
+        if (searchDTO.getStartDate() != null){
+            spec = spec.and((root, query, cb) -> 
+                cb.greaterThanOrEqualTo((root.get("tradeDate")), searchDTO.getStartDate())
+            );
+        }    
+
+        if (searchDTO.getEndDate() != null){
+            spec = spec.and((root, query, cb) -> 
+                cb.lessThanOrEqualTo((root.get("tradeDate")), searchDTO.getEndDate())
+            );    
+        }
+        return spec;
+    }
+
+
+    private void validateDateRange(TradeSearchDTO searchDTO){
+        if(searchDTO.getStartDate() != null && searchDTO.getEndDate() != null){
+            if(searchDTO.getStartDate().isAfter(searchDTO.getEndDate())){
+                throw new IllegalArgumentException("Start date cannot be after end date");
+            }
+        }
+    }
+
+
 }

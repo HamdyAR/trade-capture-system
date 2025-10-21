@@ -1,6 +1,7 @@
 package com.technicalchallenge.controller;
 
 import com.technicalchallenge.dto.TradeDTO;
+import com.technicalchallenge.dto.TradeSearchDTO;
 import com.technicalchallenge.mapper.TradeMapper;
 import com.technicalchallenge.model.Trade;
 import com.technicalchallenge.service.TradeService;
@@ -204,5 +205,28 @@ public class TradeController {
             logger.error("Error cancelling trade: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body("Error cancelling trade: " + e.getMessage());
         }
+         }     
+
+
+@GetMapping("/search")
+    @Operation(summary = "Multi-criteria trade search",
+               description = "Search by counterparty, book, status, trader, and date ranges. Returns all trades that match the search criteria.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved all matching trades",
+                    content = @Content(mediaType = "application/json",
+                                     schema = @Schema(implementation = TradeDTO.class))),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    public List<TradeDTO> searchTrades(
+    @Parameter(description = "Search criteria - all fields are optional", required=false)    
+    @ModelAttribute TradeSearchDTO searchDTO
+    ) 
+    {
+        logger.info("Searching trade with criteria: {}", searchDTO);
+        return tradeService.searchTrade(searchDTO).stream()
+                .map(tradeMapper::toDto)
+                .toList();
     }
-}
+}    
+
+   
