@@ -5,7 +5,11 @@ import com.technicalchallenge.dto.TradeLegDTO;
 import com.technicalchallenge.dto.TradeSearchDTO;
 import com.technicalchallenge.model.*;
 import com.technicalchallenge.repository.*;
+import com.technicalchallenge.rsql.RsqlSpecificationBuilder;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +28,7 @@ import java.util.Optional;
 @Transactional
 public class TradeService {
     private static final Logger logger = LoggerFactory.getLogger(TradeService.class);
+
 
     @Autowired
     private TradeRepository tradeRepository;
@@ -59,6 +64,9 @@ public class TradeService {
     private PayRecRepository payRecRepository;
     @Autowired
     private AdditionalInfoService additionalInfoService;
+
+    @Autowired
+    private RsqlSpecificationBuilder<Trade> rsqlSpecificationBuilder;
 
     public List<Trade> getAllTrades() {
         logger.info("Retrieving all trades");
@@ -610,7 +618,7 @@ public class TradeService {
 
     
 
-    //New method of searching trades
+    //New method of searching trades -/search
     public List<Trade> searchTrade(TradeSearchDTO searchDTO){
         logger.info("Searching all trades satisfying criteria, {}", searchDTO);
 
@@ -635,7 +643,7 @@ public class TradeService {
 
         if (searchDTO.getBook() != null && !searchDTO.getBook().isEmpty()){
             spec = spec.and((root, query, cb) -> 
-                cb.equal(cb.lower(root.get("book").get("name")), searchDTO.getBook().toLowerCase())
+                cb.equal(cb.lower(root.get("book").get("bookName")), searchDTO.getBook().toLowerCase())
             );
         }
 
@@ -645,6 +653,12 @@ public class TradeService {
                     cb.equal(cb.lower(root.get("traderUser").get("firstName")), searchDTO.getTrader().toLowerCase()),
                     cb.equal(cb.lower(root.get("traderUser").get("lastName")), searchDTO.getTrader().toLowerCase())   
                 ));
+        }
+
+        if (searchDTO.getTradeStatus() != null && !searchDTO.getTradeStatus().isEmpty()){
+            spec = spec.and((root, query, cb) -> 
+                cb.equal(cb.lower(root.get("tradeStatus").get("tradeStatus")), searchDTO.getTradeStatus().toLowerCase())
+            );
         }
 
         if (searchDTO.getStartDate() != null){
@@ -669,6 +683,44 @@ public class TradeService {
             }
         }
     }
+
+    //New method of searching trades -/filter with pagination
+    public Page<Trade> filterTradeWithPagination(TradeSearchDTO searchDTO, Pageable pageable){
+          logger.info("Searching trades with pagination - criteria: {}, page: {}, size:{}", 
+          searchDTO, pageable.getPageNumber(), pageable.getPageSize());
+
+          validateDateRange(searchDTO);
+
+          Specification<Trade> spec = buildTradeSearchSpecification(searchDTO);
+          Page<Trade> result = tradeRepository.findAll(spec, pageable);
+          
+          logger.info("Found {} trades matching search criteria (page {} of {})", 
+          result.getNumberOfElements(), 
+          result.getNumber() + 1, result.getTotalPages());
+        
+          return result;
+
+    }
+
+    //New method of searching trades - /rsql 
+    public Page<Trade> searchTradeWithRsql(String rsqlQuery, Pageable pageable){
+         logger.info("Searching trades with RSQL query: {}, page: {}, size:{}", 
+          rsqlQuery, pageable.getPageNumber(), pageable.getPageSize());
+
+        try{
+            Specification<Trade> spec = rsqlSpecificationBuilder.createSpecification(rsqlQuery);
+            Page<Trade> result = tradeRepository.findAll(spec, pageable);
+
+            logger.info("Found {} trades matching RSQL query (page {} of {})", 
+            result.getNumberOfElements(), 
+            result.getNumber() + 1, result.getTotalPages());
+
+            return result;
+        }catch(IllegalArgumentException e){
+            throw e;
+        }
+    }
+
 
 
 }

@@ -17,12 +17,19 @@ import com.technicalchallenge.repository.ScheduleRepository;
 import com.technicalchallenge.repository.TradeLegRepository;
 import com.technicalchallenge.repository.TradeRepository;
 import com.technicalchallenge.repository.TradeStatusRepository;
+import com.technicalchallenge.rsql.RsqlSpecificationBuilder;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
@@ -65,6 +72,9 @@ class TradeServiceTest {
 
     @Mock
     private AdditionalInfoService additionalInfoService;
+
+    @Mock
+    private RsqlSpecificationBuilder<Trade> rsqlSpecificationBuilder;
 
     @InjectMocks
     private TradeService tradeService;
@@ -337,7 +347,7 @@ class TradeServiceTest {
        @Test
         void testsearchTrade_WithNoMatches(){
             TradeSearchDTO searchDTO = new TradeSearchDTO();
-          searchDTO.setStatus("dance");
+          searchDTO.setTradeStatus("dance");
 
          when(tradeRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
 
@@ -347,4 +357,75 @@ class TradeServiceTest {
         assertEquals(0, result.size());
         verify(tradeRepository).findAll(any(Specification.class));
         }
+
+        @Test
+         void testSearchTrade_WithPagination(){
+         //Given   
+          TradeSearchDTO searchDTO = new TradeSearchDTO();
+          searchDTO.setBook("Book");
+          trade.setBook(book);
+
+          Pageable pageable = PageRequest.of(0, 20, Sort.by("tradeDate").descending());
+
+          List<Trade> trades = List.of(trade);
+          Page<Trade> expectedPage = new PageImpl<>(trades, pageable, trades.size());
+
+          when(tradeRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(expectedPage);
+
+          //When
+          Page<Trade> result = tradeService.filterTradeWithPagination(searchDTO, pageable);
+
+          //Then
+          assertNotNull(result);
+          assertEquals(1, result.getTotalElements());
+          assertEquals("Book", result.getContent().get(0).getBook().getBookName());
+
+          verify(tradeRepository).findAll(any(Specification.class), eq(pageable));
+         }
+
+
+         @Test
+         void testSearchTrade_WithRSQL(){
+         //Given   
+          String rsqlQuery = "book.name==book";
+          Pageable pageable = PageRequest.of(0, 20);
+
+          List<Trade> trades = List.of(trade);
+          Page<Trade> expectedPage = new PageImpl<>(trades, pageable, trades.size());
+
+          Specification<Trade> spec = (root, query, cb) -> cb.conjunction();
+
+          when(rsqlSpecificationBuilder.createSpecification(rsqlQuery)).thenReturn(spec);
+          when(tradeRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(expectedPage);
+
+
+
+          //When
+          Page<Trade> result = tradeService.searchTradeWithRsql(rsqlQuery, pageable);
+
+          //Then
+          assertNotNull(result);
+          assertEquals(1, result.getTotalElements());
+          assertEquals(1, result.getContent().size());
+
+          verify(rsqlSpecificationBuilder).createSpecification(rsqlQuery);
+          verify(tradeRepository).findAll(any(Specification.class), eq(pageable));
+         }
+
+
+         @Test
+         void testSearchTrade_WithRSQL_InvalidQuery(){
+         //Given   
+          String query = "wrong==syntax";
+          Pageable pageable = PageRequest.of(0, 20);
+
+          when(rsqlSpecificationBuilder.createSpecification(query)).thenThrow(new IllegalArgumentException("Invalid RSQL query: " + query));
+
+         assertThrows(IllegalArgumentException.class, () -> {
+            tradeService.searchTradeWithRsql(query, pageable);
+         });
+
+         verify(rsqlSpecificationBuilder).createSpecification(query);
+         }
+
 }

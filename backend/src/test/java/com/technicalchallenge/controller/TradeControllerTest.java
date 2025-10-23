@@ -15,6 +15,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
@@ -84,7 +88,7 @@ public class TradeControllerTest {
         searchDTO = new TradeSearchDTO();
         searchDTO.setBook(tradeDTO.getBookName());
         searchDTO.setCounterparty(tradeDTO.getCounterpartyName());
-        searchDTO.setStatus(tradeDTO.getTradeStatus());
+        searchDTO.setTradeStatus(tradeDTO.getTradeStatus());
     }
 
     @Test
@@ -269,6 +273,70 @@ public class TradeControllerTest {
         verify(tradeService).searchTrade(any(TradeSearchDTO.class));
     }
 
+    @Test
+    void testFilterTradeWithPagination() throws Exception {
+        // Given
+        List<Trade> trades = List.of(trade);
+        Page<Trade> tradePage = new PageImpl<>(trades, PageRequest.of(0,20), trades.size());
 
-    
+
+        when(tradeService.filterTradeWithPagination(any(TradeSearchDTO.class), any(Pageable.class))).thenReturn((tradePage));
+
+        // When/Then
+        mockMvc.perform(get("/api/trades/filter")
+                        .param("book", "book")
+                        .param("page", "0")
+                        .param("size", "20")
+                        .param("sortBy", "tradeDate")
+                        .param("sortDir", "desc")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].tradeId", is(1001)))
+                .andExpect(jsonPath("$.totalElements", is(1)))
+                .andExpect(jsonPath("$.number", is(0)));
+                
+
+        verify(tradeService).filterTradeWithPagination(any(TradeSearchDTO.class), any(Pageable.class));
+    }
+
+
+
+    @Test
+    void testSearchTrade_Rsql() throws Exception {
+        // Given
+        List<Trade> trades = List.of(trade);
+        Page<Trade> tradePage = new PageImpl<>(trades, PageRequest.of(0,20), trades.size());
+
+        when(tradeService.searchTradeWithRsql(any(String.class), any(Pageable.class))).thenReturn((tradePage));
+
+        // When/Then
+        mockMvc.perform(get("/api/trades/rsql")
+                        .param("query", "book.name==book")
+                        .param("page", "0")
+                        .param("size", "20")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].tradeId", is(1001)))
+                .andExpect(jsonPath("$.totalElements", is(1)));
+                
+
+        verify(tradeService).searchTradeWithRsql((any(String.class)), any(Pageable.class));
+    }
+
+    @Test
+    void testSearchTrade_RsqlWithEmptyQuery() throws Exception {
+        // Given
+
+        when(tradeService.searchTradeWithRsql(any(String.class), any(Pageable.class))).thenThrow(new IllegalArgumentException("RSQL query cannot be empty"));
+
+        // When/Then
+        mockMvc.perform(get("/api/trades/rsql")
+                        .param("query", "")
+                        .param("page", "0")
+                        .param("size", "20")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+    }
 }

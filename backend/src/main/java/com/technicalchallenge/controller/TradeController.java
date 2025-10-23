@@ -6,6 +6,10 @@ import com.technicalchallenge.mapper.TradeMapper;
 import com.technicalchallenge.model.Trade;
 import com.technicalchallenge.service.TradeService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -24,6 +28,7 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 @RestController
 @RequestMapping("/api/trades")
@@ -217,7 +222,7 @@ public class TradeController {
                                      schema = @Schema(implementation = TradeDTO.class))),
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
-    public List<TradeDTO> searchTrades(
+    public List<TradeDTO> searchTrade(
     @Parameter(description = "Search criteria - all fields are optional", required=false)    
     @ModelAttribute TradeSearchDTO searchDTO
     ) 
@@ -226,6 +231,87 @@ public class TradeController {
         return tradeService.searchTrade(searchDTO).stream()
                 .map(tradeMapper::toDto)
                 .toList();
+    }
+
+
+
+
+    @GetMapping("/filter")
+    @Operation(summary = "Paginated multi-criteria trade search",
+               description = "Search by counterparty, book, status, trader, and date ranges with pagination support. Ideal for high-volume result sets.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved paginated trades",
+                    content = @Content(mediaType = "application/json",
+                                     schema = @Schema(implementation = TradeDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid pagination parameters"),                            
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    public Page<TradeDTO> filterTrade(
+    @Parameter(description = "Search criteria - all fields are optional", required=false)    
+      @ModelAttribute TradeSearchDTO searchDTO,
+    @Parameter(description="Page number (0-indexed)", example="0")
+     @RequestParam(defaultValue = "0") int page,
+    @Parameter(description="Page size", example="20")
+     @RequestParam(defaultValue = "20") int size,
+    @Parameter(description="Sort by field", example="tradeDate")
+     @RequestParam(defaultValue = "tradeDate") String sortBy,
+    @Parameter(description="Sort direction(asc/desc)", example="desc")
+     @RequestParam(defaultValue = "desc") String sortDir
+    ) 
+    {
+        logger.info("Filtering trades with pagination - criteria: {}, page: {}, size: {}, sort: {} {}", searchDTO, page, size, sortBy, sortDir);
+
+        //creating Pageable object
+        Sort sort = sortDir.equalsIgnoreCase("asc")
+          ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        
+        Pageable pageable = PageRequest.of(page, size, sort);
+        
+        Page<Trade> tradePage = tradeService.filterTradeWithPagination(searchDTO, pageable);
+
+
+        return tradePage.map(tradeMapper::toDto);
+    }
+
+
+
+
+
+
+    @GetMapping("/rsql")
+    @Operation(summary = "RSQL based trade search",
+               description = "Search trades using RSQL query language for advanced filtering, book, status, trader, and date ranges with pagination support. Ideal for high-volume result sets.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved trades matching RSQL query",
+                    content = @Content(mediaType = "application/json",
+                                     schema = @Schema(implementation = TradeDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid RSQL query syntax"),                            
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    public Page<TradeDTO> searchTradeWithRSQL(
+    @Parameter(description = "RSQL query string", required=true)    
+      @RequestParam String query,
+    @Parameter(description="Page number (0-indexed)", example="0")
+     @RequestParam(defaultValue = "0") int page,
+    @Parameter(description="Page size", example="20")
+     @RequestParam(defaultValue = "20") int size,
+    @Parameter(description="Sort by field", example="tradeDate")
+     @RequestParam(defaultValue = "tradeDate") String sortBy,
+    @Parameter(description="Sort direction(asc/desc)", example="desc")
+     @RequestParam(defaultValue = "desc") String sortDir
+    ) 
+    {
+        logger.info("RSQL search - query: {}, page: {}, size: {}, sort: {} {}", query, page, size, sortBy, sortDir);
+
+        //creating Pageable object
+        Sort sort = sortDir.equalsIgnoreCase("asc")
+          ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        
+        Pageable pageable = PageRequest.of(page, size, sort);
+        
+        Page<Trade> tradePage = tradeService.searchTradeWithRsql(query, pageable);
+
+        return tradePage.map(tradeMapper::toDto);
     }
 }    
 

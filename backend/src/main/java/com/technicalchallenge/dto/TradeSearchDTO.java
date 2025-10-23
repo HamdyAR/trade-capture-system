@@ -16,7 +16,7 @@ public class TradeSearchDTO {
     private String counterparty;
     private String book;
     private String trader;
-    private String status;
+    private String tradeStatus;
     private LocalDate startDate;
     private LocalDate endDate;
 }
