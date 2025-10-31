@@ -29,4 +29,6 @@ public interface TradeRepository extends JpaRepository<Trade, Long> , JpaSpecifi
     Optional<Trade> findLatestActiveVersionByTradeId(@Param("tradeId") Long tradeId);
 
     List<Trade> findByTraderUserId(Long userId);
+
+   
 }

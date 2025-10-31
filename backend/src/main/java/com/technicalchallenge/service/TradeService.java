@@ -1182,6 +1182,8 @@ public class TradeService {
 
        return cummulativeResult;
    }
+   
 
+  
    
 }
