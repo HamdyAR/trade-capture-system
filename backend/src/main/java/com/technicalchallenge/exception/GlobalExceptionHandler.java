@@ -46,4 +46,14 @@ public class GlobalExceptionHandler {
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
+
+    @ExceptionHandler(UnauthorizedAccessException.class)
+    public ResponseEntity<Map<String, String>> handleUnauthorizedAccessException(UnauthorizedAccessException ex){
+        Map<String, String> response = Map.of(
+            "error", "Unauthorized operation",
+            "message", ex.getMessage(),
+            "timestamp", LocalDateTime.now().toString()
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    } 
 }

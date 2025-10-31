@@ -51,9 +51,9 @@ public class TradeController {
                                      schema = @Schema(implementation = TradeDTO.class))),
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
-    public List<TradeDTO> getAllTrades() {
+    public List<TradeDTO> getAllTrades(@RequestHeader("X-User-Id") String userId) {
         logger.info("Fetching all trades");
-        return tradeService.getAllTrades().stream()
+        return tradeService.getAllTrades(userId).stream()
                 .map(tradeMapper::toDto)
                 .toList();
     }
@@ -90,12 +90,14 @@ public class TradeController {
     })
     public ResponseEntity<?> createTrade(
             @Parameter(description = "Trade details for creation", required = true)
-            @Valid @RequestBody TradeDTO tradeDTO) {
+            @Valid @RequestBody TradeDTO tradeDTO,
+            @RequestHeader("X-User-Id") String userId)
+            {
         logger.info("Creating new trade: {}", tradeDTO);
         try {
             Trade trade = tradeMapper.toEntity(tradeDTO);
             tradeService.populateReferenceDataByName(trade, tradeDTO);
-            Trade savedTrade = tradeService.saveTrade(trade, tradeDTO);
+            Trade savedTrade = tradeService.saveTrade(trade, tradeDTO, userId);
             TradeDTO responseDTO = tradeMapper.toDto(savedTrade);
             return ResponseEntity.status(HttpStatus.CREATED).body(responseDTO);
         } catch (Exception e) {
@@ -119,7 +121,8 @@ public class TradeController {
             @Parameter(description = "Unique identifier of the trade to update", required = true)
             @PathVariable Long id,
             @Parameter(description = "Updated trade details", required = true)
-            @Valid @RequestBody TradeDTO tradeDTO) {
+            @Valid @RequestBody TradeDTO tradeDTO,
+            @RequestHeader("X-User-Id") String userId) {
         logger.info("Updating trade with id: {}", id);
         try {
             // Validates the consistency between path and request body ID
@@ -131,7 +134,7 @@ public class TradeController {
             Trade trade = tradeMapper.toEntity(tradeDTO);
             trade.setId(id);// Ensure entity has ID for amendment
             tradeService.populateReferenceDataByName(trade, tradeDTO);
-            Trade savedTrade = tradeService.saveTrade(trade, tradeDTO);
+            Trade savedTrade = tradeService.saveTrade(trade, tradeDTO, userId);
             TradeDTO responseDTO = tradeMapper.toDto(savedTrade);
             return ResponseEntity.ok(responseDTO);
         } catch (Exception e) {
@@ -151,10 +154,11 @@ public class TradeController {
     })
     public ResponseEntity<?> deleteTrade(
             @Parameter(description = "Unique identifier of the trade to delete", required = true)
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") String userId) {
         logger.info("Deleting trade with id: {}", id);
         try {
-            tradeService.deleteTrade(id);
+            tradeService.deleteTrade(id, userId);
             return ResponseEntity.ok().body("Trade deleted successfully");
         } catch (Exception e) {
             logger.error("Error deleting trade: {}", e.getMessage(), e);
@@ -175,10 +179,11 @@ public class TradeController {
     })
     public ResponseEntity<?> terminateTrade(
             @Parameter(description = "Unique identifier of the trade to terminate", required = true)
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") String userId) {
         logger.info("Terminating trade with id: {}", id);
         try {
-            Trade terminatedTrade = tradeService.terminateTrade(id);
+            Trade terminatedTrade = tradeService.terminateTrade(id, userId);
             TradeDTO responseDTO = tradeMapper.toDto(terminatedTrade);
             return ResponseEntity.ok(responseDTO);
         } catch (Exception e) {
@@ -200,10 +205,11 @@ public class TradeController {
     })
     public ResponseEntity<?> cancelTrade(
             @Parameter(description = "Unique identifier of the trade to cancel", required = true)
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") String userId) {
         logger.info("Cancelling trade with id: {}", id);
         try {
-            Trade cancelledTrade = tradeService.cancelTrade(id);
+            Trade cancelledTrade = tradeService.cancelTrade(id, userId);
             TradeDTO responseDTO = tradeMapper.toDto(cancelledTrade);
             return ResponseEntity.ok(responseDTO);
         } catch (Exception e) {

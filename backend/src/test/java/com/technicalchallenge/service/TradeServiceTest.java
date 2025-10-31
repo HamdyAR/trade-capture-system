@@ -1,24 +1,50 @@
 package com.technicalchallenge.service;
 
+import com.technicalchallenge.controller.UserProfileController;
+import com.technicalchallenge.dto.CashflowDTO;
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeLegDTO;
 import com.technicalchallenge.dto.TradeSearchDTO;
+import com.technicalchallenge.model.ApplicationUser;
 import com.technicalchallenge.model.Book;
+import com.technicalchallenge.model.BusinessDayConvention;
 import com.technicalchallenge.model.Cashflow;
 import com.technicalchallenge.model.Counterparty;
+import com.technicalchallenge.model.Currency;
+import com.technicalchallenge.model.HolidayCalendar;
+import com.technicalchallenge.model.Index;
+import com.technicalchallenge.model.LegType;
+import com.technicalchallenge.model.PayRec;
+import com.technicalchallenge.model.Privilege;
 import com.technicalchallenge.model.Schedule;
 import com.technicalchallenge.model.Trade;
 import com.technicalchallenge.model.TradeLeg;
 import com.technicalchallenge.model.TradeStatus;
+import com.technicalchallenge.model.TradeSubType;
+import com.technicalchallenge.model.TradeType;
+import com.technicalchallenge.model.UserPrivilege;
+import com.technicalchallenge.model.UserProfile;
+import com.technicalchallenge.repository.ApplicationUserRepository;
 import com.technicalchallenge.repository.BookRepository;
+import com.technicalchallenge.repository.BusinessDayConventionRepository;
 import com.technicalchallenge.repository.CashflowRepository;
 import com.technicalchallenge.repository.CounterpartyRepository;
+import com.technicalchallenge.repository.CurrencyRepository;
+import com.technicalchallenge.repository.HolidayCalendarRepository;
+import com.technicalchallenge.repository.IndexRepository;
+import com.technicalchallenge.repository.LegTypeRepository;
+import com.technicalchallenge.repository.PayRecRepository;
+import com.technicalchallenge.repository.PrivilegeRepository;
 import com.technicalchallenge.repository.ScheduleRepository;
 import com.technicalchallenge.repository.TradeLegRepository;
 import com.technicalchallenge.repository.TradeRepository;
 import com.technicalchallenge.repository.TradeStatusRepository;
+import com.technicalchallenge.repository.TradeSubTypeRepository;
+import com.technicalchallenge.repository.TradeTypeRepository;
+import com.technicalchallenge.repository.UserPrivilegeRepository;
 import com.technicalchallenge.rsql.RsqlSpecificationBuilder;
 
+import org.h2.engine.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +68,9 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 // import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -69,6 +98,38 @@ class TradeServiceTest {
     @Mock
     private ScheduleRepository scheduleRepository;
 
+     @Mock
+    private ApplicationUserRepository applicationUserRepository;
+
+     @Mock
+    private PrivilegeRepository privilegeRepository;
+
+     @Mock
+    private UserPrivilegeRepository userPrivilegeRepository;
+
+    @Mock
+    private TradeTypeRepository tradeTypeRepository;
+
+    @Mock
+    private TradeSubTypeRepository tradeSubTypeRepository;
+
+    @Mock
+    private CurrencyRepository currencyRepository;
+
+    @Mock
+    private HolidayCalendarRepository holidayCalendarRepository;
+
+    @Mock
+    private BusinessDayConventionRepository businessDayConventionRepository;
+
+    @Mock
+    private LegTypeRepository legTypeRepository;
+
+    @Mock
+    private IndexRepository indexRepository;
+
+    @Mock
+    private PayRecRepository payRecRepository;
 
     @Mock
     private AdditionalInfoService additionalInfoService;
@@ -84,28 +145,57 @@ class TradeServiceTest {
     private Book book;
     private Counterparty counterparty;
     private TradeStatus tradeStatus;
+    private ApplicationUser user;
+    private Privilege privilege;
+    private UserPrivilege userPrivilege;
+    private UserProfile userProfile;
 
     @BeforeEach
     void setUp() {
         // Set up test data
         tradeDTO = new TradeDTO();
         tradeDTO.setTradeId(100001L);
-        tradeDTO.setTradeDate(LocalDate.of(2025, 1, 15));
-        tradeDTO.setTradeStartDate(LocalDate.of(2025, 1, 17));
-        tradeDTO.setTradeMaturityDate(LocalDate.of(2026, 1, 17));
+        tradeDTO.setTradeDate(LocalDate.of(2025, 10, 15));
+        tradeDTO.setTradeStartDate(LocalDate.of(2025, 10, 17));
+        tradeDTO.setTradeMaturityDate(LocalDate.of(2026, 10, 17));
         tradeDTO.setVersion(1);
+        tradeDTO.setTradeType("Swap");
+        tradeDTO.setTradeSubType("IR Swap");
+
+
+        CashflowDTO cashflow1 = new CashflowDTO();
+        CashflowDTO cashflow2 = new CashflowDTO();
+
+        cashflow1.setValueDate(LocalDate.of(2026, 10, 17));
+        cashflow2.setValueDate(LocalDate.of(2026, 10, 17));
+
+        List<CashflowDTO> leg1cashflow = Arrays.asList(cashflow1);
+        List<CashflowDTO> leg2cashflow = Arrays.asList(cashflow2);
 
         TradeLegDTO leg1 = new TradeLegDTO();
         leg1.setNotional(BigDecimal.valueOf(1000000));
         leg1.setRate(0.05);
         leg1.setCalculationPeriodSchedule("1M");
+        leg1.setLegType("Fixed");
+        leg1.setPayReceiveFlag("Pay");
+        leg1.setCashflows(leg1cashflow);
+        leg1.setCurrency("USD");
+        leg1.setPaymentBusinessDayConvention("Following");
+        leg1.setHolidayCalendar("NY");
 
         TradeLegDTO leg2 = new TradeLegDTO();
         leg2.setNotional(BigDecimal.valueOf(1000000));
         leg2.setRate(0.0);
         leg2.setCalculationPeriodSchedule("1M");
+        leg2.setLegType("Floating");
+        leg2.setPayReceiveFlag("Receive");
+        leg2.setCashflows(leg2cashflow);
+        leg2.setIndexName("LIBOR");
+        leg2.setCurrency("USD");
+        leg2.setHolidayCalendar("NY");
 
         tradeDTO.setTradeLegs(Arrays.asList(leg1, leg2));
+        tradeDTO.setTraderUserName("Simon King");
 
         trade = new Trade();
         trade.setId(1L);
@@ -115,10 +205,12 @@ class TradeServiceTest {
         book = new Book();
         book.setId(1L);
         book.setBookName("Book");
+        book.setActive(true);
 
         counterparty = new Counterparty();
         counterparty.setId(1L);
         counterparty.setName("Counterparty");
+        counterparty.setActive(true);
 
         tradeStatus = new TradeStatus();
         tradeStatus.setId(1L);
@@ -127,23 +219,54 @@ class TradeServiceTest {
         tradeDTO.setBookName(book.getBookName());
         tradeDTO.setCounterpartyName(counterparty.getName());
         tradeDTO.setTradeStatus(tradeStatus.getTradeStatus());
+
+        userProfile = new UserProfile();
+        userProfile.setUserType("TRADER_SALES");
+
+        user = new ApplicationUser();
+        user.setLoginId("simon");
+        user.setActive(true);
+        user.setId(10001L);
+        user.setUserProfile(userProfile);
+        user.setFirstName("Simon");
+
+        privilege = new Privilege();
+        privilege.setName("BOOK_TRADE");
+        privilege.setId(10001L);
+
+        userPrivilege = new UserPrivilege();
+        userPrivilege.setUserId(10001L);
+        userPrivilege.setPrivilegeId(10003L);
     }
 
     private void createTradeMocks(){
-        when(bookRepository.findByBookName(any(String.class))).thenReturn(Optional.of(new Book()));
-        when(counterpartyRepository.findByName(any(String.class))).thenReturn(Optional.of(new Counterparty()));
+        when(bookRepository.findByBookName(any(String.class))).thenReturn(Optional.of(book));
+        when(counterpartyRepository.findByName(any(String.class))).thenReturn(Optional.of(counterparty));
         when(tradeStatusRepository.findByTradeStatus(any(String.class))).thenReturn(Optional.of(new TradeStatus()));
         when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(tradeLegRepository.save(any(TradeLeg.class))).thenAnswer(invocation -> invocation.getArgument(0));
+         when(applicationUserRepository.findByLoginId(anyString())).thenReturn(Optional.of(user));
+         when(privilegeRepository.findByName(anyString())).thenReturn(Optional.of(privilege));
+         when(userPrivilegeRepository.existsByUserIdAndPrivilegeId(anyLong(), anyLong())).thenReturn(true);
+        when(applicationUserRepository.findByFirstName(any(String.class))).thenReturn(Optional.of(user));
+        
+        when(tradeTypeRepository.findByTradeType(any(String.class))).thenReturn(Optional.of(new TradeType()));
+        when(tradeSubTypeRepository.findByTradeSubType(any(String.class))).thenReturn(Optional.of(new TradeSubType()));
+        when(currencyRepository.findByCurrency(any(String.class))).thenReturn(Optional.of(new Currency()));
+        when(legTypeRepository.findByType(any(String.class))).thenReturn(Optional.of(new LegType()));
+        when(indexRepository.findByIndex(any(String.class))).thenReturn(Optional.of(new Index()));
+        when(holidayCalendarRepository.findByHolidayCalendar(any(String.class))).thenReturn(Optional.of(new HolidayCalendar()));
+        when(payRecRepository.findByPayRec(any(String.class))).thenReturn(Optional.of(new PayRec()));
+        when(businessDayConventionRepository.findByBdc(any(String.class))).thenReturn(Optional.of(new BusinessDayConvention()));
     }
 
     @Test
     void testCreateTrade_Success() { 
         // Given
         createTradeMocks();
-
+        
         // When
-        Trade result = tradeService.createTrade(tradeDTO);
+        Trade result = tradeService.createTrade(tradeDTO, user.getLoginId());
 
         // Then
         assertNotNull(result);
@@ -155,15 +278,17 @@ class TradeServiceTest {
     void testCreateTrade_InvalidDates_ShouldFail() {
         //Case 1: Invalid start date
         // Given
+        
         tradeDTO.setTradeStartDate(LocalDate.of(2025, 1, 10)); // Invalid - Before trade date
-
+        createTradeMocks();
+    
         // When & Then
         RuntimeException startDateException = assertThrows(RuntimeException.class, () -> {
-            tradeService.createTrade(tradeDTO);
+            tradeService.createTrade(tradeDTO, user.getLoginId());
         });
 
         //Assert
-        assertEquals("Start date cannot be before trade date", startDateException.getMessage());
+        assertEquals("Trade validation failed Start date cannot be before trade date", startDateException.getMessage());
 
         //Case 2: Invalid maturity date
         //Given
@@ -172,7 +297,7 @@ class TradeServiceTest {
 
         // When & Then
         RuntimeException maturityDateException = assertThrows(RuntimeException.class, () -> {
-            tradeService.createTrade(tradeDTO);
+            tradeService.createTrade(tradeDTO, user.getLoginId());
         });
 
         //Assert
@@ -185,9 +310,11 @@ class TradeServiceTest {
         // Given
         tradeDTO.setTradeLegs(Arrays.asList(new TradeLegDTO())); // Only 1 leg
 
+        createTradeMocks();
+
         // When & Then
         RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            tradeService.createTrade(tradeDTO);
+            tradeService.createTrade(tradeDTO, user.getLoginId());
         });
 
         assertTrue(exception.getMessage().contains("exactly 2 legs"));
@@ -229,7 +356,7 @@ class TradeServiceTest {
         when(tradeLegRepository.save(any(TradeLeg.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
-        Trade result = tradeService.amendTrade(100001L, tradeDTO);
+        Trade result = tradeService.amendTrade(100001L, tradeDTO, user.getLoginId());
 
         // Then
         assertNotNull(result);
@@ -243,7 +370,7 @@ class TradeServiceTest {
 
         // When & Then
         RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            tradeService.amendTrade(999L, tradeDTO);
+            tradeService.amendTrade(999L, tradeDTO, user.getLoginId());
         });
 
         assertTrue(exception.getMessage().contains("Trade not found"));
@@ -262,7 +389,7 @@ class TradeServiceTest {
        when(scheduleRepository.findBySchedule(any(String.class))).thenReturn(Optional.of(schedule));
     
         // When - execute the service method, createTrade()
-        Trade result = tradeService.createTrade(tradeDTO);
+        Trade result = tradeService.createTrade(tradeDTO, user.getLoginId());
      
         // Then - Assert the results
         for(TradeLeg leg : result.getTradeLegs()){
