@@ -143,6 +143,8 @@ class TradeServiceTest {
     private TradeDTO tradeDTO;
     private Trade trade;
     private Book book;
+    private TradeLegDTO leg1;
+    private TradeLegDTO leg2;
     private Counterparty counterparty;
     private TradeStatus tradeStatus;
     private ApplicationUser user;
@@ -172,7 +174,8 @@ class TradeServiceTest {
         List<CashflowDTO> leg1cashflow = Arrays.asList(cashflow1);
         List<CashflowDTO> leg2cashflow = Arrays.asList(cashflow2);
 
-        TradeLegDTO leg1 = new TradeLegDTO();
+        leg1 = new TradeLegDTO();
+        leg1.setLegId(1001L);
         leg1.setNotional(BigDecimal.valueOf(1000000));
         leg1.setRate(0.05);
         leg1.setCalculationPeriodSchedule("1M");
@@ -183,7 +186,8 @@ class TradeServiceTest {
         leg1.setPaymentBusinessDayConvention("Following");
         leg1.setHolidayCalendar("NY");
 
-        TradeLegDTO leg2 = new TradeLegDTO();
+        leg2 = new TradeLegDTO();
+        leg2.setLegId(2001L);
         leg2.setNotional(BigDecimal.valueOf(1000000));
         leg2.setRate(0.0);
         leg2.setCalculationPeriodSchedule("1M");
@@ -245,15 +249,19 @@ class TradeServiceTest {
         when(tradeStatusRepository.findByTradeStatus(any(String.class))).thenReturn(Optional.of(new TradeStatus()));
         when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(tradeLegRepository.save(any(TradeLeg.class))).thenAnswer(invocation -> invocation.getArgument(0));
-         when(applicationUserRepository.findByLoginId(anyString())).thenReturn(Optional.of(user));
+        when(applicationUserRepository.findByLoginId(anyString())).thenReturn(Optional.of(user));
          when(privilegeRepository.findByName(anyString())).thenReturn(Optional.of(privilege));
          when(userPrivilegeRepository.existsByUserIdAndPrivilegeId(anyLong(), anyLong())).thenReturn(true);
         when(applicationUserRepository.findByFirstName(any(String.class))).thenReturn(Optional.of(user));
-        
+   
+
+        LegType legType = new LegType();
+        legType.setType("Fixed");
+       
         when(tradeTypeRepository.findByTradeType(any(String.class))).thenReturn(Optional.of(new TradeType()));
         when(tradeSubTypeRepository.findByTradeSubType(any(String.class))).thenReturn(Optional.of(new TradeSubType()));
         when(currencyRepository.findByCurrency(any(String.class))).thenReturn(Optional.of(new Currency()));
-        when(legTypeRepository.findByType(any(String.class))).thenReturn(Optional.of(new LegType()));
+        when(legTypeRepository.findByType(any(String.class))).thenReturn(Optional.of(legType));
         when(indexRepository.findByIndex(any(String.class))).thenReturn(Optional.of(new Index()));
         when(holidayCalendarRepository.findByHolidayCalendar(any(String.class))).thenReturn(Optional.of(new HolidayCalendar()));
         when(payRecRepository.findByPayRec(any(String.class))).thenReturn(Optional.of(new PayRec()));
@@ -397,6 +405,8 @@ class TradeServiceTest {
         }
     }
 
+
+    //advanced search tests
     @Test
      void testSearch_Trade(){
         trade.setBook(book);
@@ -426,7 +436,7 @@ class TradeServiceTest {
         verify(tradeRepository).findAll(any(Specification.class));
      }
 
-     @Test
+    @Test
       void testSearchTrade_InvalidDates_ShouldFail(){
         TradeSearchDTO searchDTO = new TradeSearchDTO();
         searchDTO.setStartDate(LocalDate.of(2025, 1, 10));
@@ -439,8 +449,8 @@ class TradeServiceTest {
         assertEquals("Start date cannot be after end date", startDateSearchException.getMessage());
       }
 
-      @Test
-       void testSearchTrade_WithoutFilters(){
+    @Test
+    void testSearchTrade_WithoutFilters(){
          TradeSearchDTO searchDTO = new TradeSearchDTO();
          List<Trade> trades = Arrays.asList(trade);
 
@@ -453,9 +463,8 @@ class TradeServiceTest {
         verify(tradeRepository).findAll(any(Specification.class));
        }
 
-
-       @Test
-       void testSearchTrade_WithNullValues(){
+    @Test
+    void testSearchTrade_WithNullValues(){
          TradeSearchDTO searchDTO = new TradeSearchDTO();
           searchDTO.setBook(null);
           searchDTO.setCounterparty(null);
@@ -471,8 +480,8 @@ class TradeServiceTest {
         verify(tradeRepository).findAll(any(Specification.class));
        }
        
-       @Test
-        void testsearchTrade_WithNoMatches(){
+    @Test
+    void testsearchTrade_WithNoMatches(){
             TradeSearchDTO searchDTO = new TradeSearchDTO();
           searchDTO.setTradeStatus("dance");
 
@@ -485,8 +494,8 @@ class TradeServiceTest {
         verify(tradeRepository).findAll(any(Specification.class));
         }
 
-        @Test
-         void testSearchTrade_WithPagination(){
+    @Test
+    void testSearchTrade_WithPagination(){
          //Given   
           TradeSearchDTO searchDTO = new TradeSearchDTO();
           searchDTO.setBook("Book");
@@ -510,9 +519,8 @@ class TradeServiceTest {
           verify(tradeRepository).findAll(any(Specification.class), eq(pageable));
          }
 
-
-         @Test
-         void testSearchTrade_WithRSQL(){
+    @Test
+    void testSearchTrade_WithRSQL(){
          //Given   
           String rsqlQuery = "book.name==book";
           Pageable pageable = PageRequest.of(0, 20);
@@ -539,9 +547,8 @@ class TradeServiceTest {
           verify(tradeRepository).findAll(any(Specification.class), eq(pageable));
          }
 
-
-         @Test
-         void testSearchTrade_WithRSQL_InvalidQuery(){
+    @Test
+    void testSearchTrade_WithRSQL_InvalidQuery(){
          //Given   
           String query = "wrong==syntax";
           Pageable pageable = PageRequest.of(0, 20);
@@ -555,4 +562,155 @@ class TradeServiceTest {
          verify(rsqlSpecificationBuilder).createSpecification(query);
          }
 
+
+    //cashflow value tests
+    @Test
+    void testCashflowValue_QuarterlySchedule(){
+        //$10M at 3.5% quarterly = $87,500 (not $875,000)
+
+        leg1.setNotional(BigDecimal.valueOf(10000000));
+        leg1.setRate(3.5);
+        leg1.setCalculationPeriodSchedule("3M");
+
+        leg2.setNotional(BigDecimal.valueOf(10000000));
+
+        Schedule schedule = new Schedule();
+        schedule.setId(1L);
+        schedule.setSchedule("3M");
+
+        createTradeMocks();
+       
+        when(scheduleRepository.findBySchedule(any(String.class))).thenReturn(Optional.of(schedule));
+    
+        // When - execute the service method
+        Trade result = tradeService.createTrade(tradeDTO, user.getLoginId());
+     
+        // Then - Assert the results
+        TradeLeg fixedLeg = result.getTradeLegs().get(0);//fixed leg
+            assertEquals(4, fixedLeg.getCashflows().size());
+            assertEquals(0, fixedLeg.getCashflows().get(0).getPaymentValue().compareTo(BigDecimal.valueOf(87500.00)));
+         }
+        
+    @Test
+    void testCashflowValue_MonthlySchedule(){
+
+        leg1.setNotional(BigDecimal.valueOf(2000000));
+        leg1.setRate(5.0);
+        leg1.setCalculationPeriodSchedule("1M");
+
+        leg2.setNotional(BigDecimal.valueOf(2000000));
+
+        Schedule schedule = new Schedule();
+        schedule.setId(1L);
+        schedule.setSchedule("1M");
+
+        createTradeMocks();
+       
+        when(scheduleRepository.findBySchedule(any(String.class))).thenReturn(Optional.of(schedule));
+    
+        // When - execute the service method
+        Trade result = tradeService.createTrade(tradeDTO, user.getLoginId());
+     
+        // Then - Assert the results
+        TradeLeg fixedLeg = result.getTradeLegs().get(0);//fixed leg
+            assertEquals(12, fixedLeg.getCashflows().size());
+            assertEquals(0, fixedLeg.getCashflows().get(0).getPaymentValue().compareTo(BigDecimal.valueOf(8333.33)));
+         }  
+   
+    @Test
+    void testCashflowValue_SemiAnnuallySchedule(){
+
+        leg1.setNotional(BigDecimal.valueOf(500000));
+        leg1.setRate(2.5);
+        leg1.setCalculationPeriodSchedule("6M");
+
+        leg2.setNotional(BigDecimal.valueOf(500000));
+
+        Schedule schedule = new Schedule();
+        schedule.setId(1L);
+        schedule.setSchedule("6M");
+
+        createTradeMocks();
+       
+        when(scheduleRepository.findBySchedule(any(String.class))).thenReturn(Optional.of(schedule));
+    
+        // When - execute the service method
+        Trade result = tradeService.createTrade(tradeDTO, user.getLoginId());
+     
+        // Then - Assert the results
+        TradeLeg fixedLeg = result.getTradeLegs().get(0);//fixed leg
+            assertEquals(2, fixedLeg.getCashflows().size());
+            assertEquals(0, fixedLeg.getCashflows().get(0).getPaymentValue().compareTo(BigDecimal.valueOf(6250.00)));
+         }  
+
+    @Test
+    void testCashflowValue_AnnuallySchedule(){
+
+        leg1.setNotional(BigDecimal.valueOf(750000));
+        leg1.setRate(4.5);
+        leg1.setCalculationPeriodSchedule("Yearly");
+
+        leg2.setNotional(BigDecimal.valueOf(750000));
+
+        Schedule schedule = new Schedule();
+        schedule.setId(1L);
+        schedule.setSchedule("12M");
+
+        createTradeMocks();
+       
+        when(scheduleRepository.findBySchedule(any(String.class))).thenReturn(Optional.of(schedule));
+    
+        // When - execute the service method
+        Trade result = tradeService.createTrade(tradeDTO, user.getLoginId());
+     
+        // Then - Assert the results
+        TradeLeg fixedLeg = result.getTradeLegs().get(0);//fixed leg
+            assertEquals(1, fixedLeg.getCashflows().size());
+            assertEquals(0, fixedLeg.getCashflows().get(0).getPaymentValue().compareTo(BigDecimal.valueOf(33750.00)));
+         } 
+         
+       @Test
+        void testCashflowValue_FloatingLeg(){
+
+        //floating leg
+        leg2.setNotional(BigDecimal.valueOf(750000));
+
+        Schedule schedule = new Schedule();
+        schedule.setId(1L);
+        schedule.setSchedule("12M");
+
+        createTradeMocks();
+       
+        when(scheduleRepository.findBySchedule(any(String.class))).thenReturn(Optional.of(schedule));
+    
+        // When - execute the service method
+        Trade result = tradeService.createTrade(tradeDTO, user.getLoginId());
+     
+        // Then - Assert the results
+        TradeLeg floatingLeg = result.getTradeLegs().get(1);//floating leg
+            assertEquals(1, floatingLeg.getCashflows().size());
+            assertEquals(0, floatingLeg.getCashflows().get(0).getPaymentValue().compareTo(BigDecimal.ZERO));
+         }  
+
+         @Test
+        void testCashflowValue_NullLegType(){
+
+        //null leg
+        leg1.setLegType(null);
+
+        Schedule schedule = new Schedule();
+        schedule.setId(1L);
+        schedule.setSchedule("12M");
+
+        createTradeMocks();
+       
+        when(scheduleRepository.findBySchedule(any(String.class))).thenReturn(Optional.of(schedule));
+    
+        // When - execute the service method
+        Trade result = tradeService.createTrade(tradeDTO, user.getLoginId());
+     
+        // Then - Assert the results
+        TradeLeg nullLeg = result.getTradeLegs().get(0);//null leg
+            assertEquals(0, nullLeg.getCashflows().get(0).getPaymentValue().compareTo(BigDecimal.ZERO));
+         } 
 }

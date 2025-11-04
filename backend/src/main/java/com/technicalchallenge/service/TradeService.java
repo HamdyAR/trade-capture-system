@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -650,13 +651,14 @@ public class TradeService {
         String legType = leg.getLegRateType().getType();
 
         if ("Fixed".equals(legType)) {
-            double notional = leg.getNotional().doubleValue();
-            double rate = leg.getRate();
-            double months = monthsInterval;
+            BigDecimal notional = leg.getNotional();
+            BigDecimal rate = BigDecimal.valueOf(leg.getRate()).divide(BigDecimal.valueOf(100));
+            BigDecimal months = BigDecimal.valueOf(monthsInterval);
+            BigDecimal twelve = BigDecimal.valueOf(12);
 
-            double result = (notional * rate * months) / 12;
+            BigDecimal result = notional.multiply(rate).multiply(months).divide(twelve,2, RoundingMode.HALF_UP);
 
-            return BigDecimal.valueOf(result);
+            return result;
         } else if ("Floating".equals(legType)) {
             return BigDecimal.ZERO;
         }
