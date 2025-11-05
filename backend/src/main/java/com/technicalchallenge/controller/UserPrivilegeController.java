@@ -37,9 +37,9 @@ public class UserPrivilegeController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<UserPrivilegeDTO> getUserPrivilegeById(@PathVariable Long id) {
-        logger.debug("Fetching user privilege by id: {}", id);
-        Optional<UserPrivilege> userPrivilege = userPrivilegeService.getUserPrivilegeById(id);
+    public ResponseEntity<UserPrivilegeDTO> getUserPrivilegeById(@PathVariable Long userId, @PathVariable Long privilegeId) {
+        // logger.debug("Fetching user privilege by id: {}", id);
+        Optional<UserPrivilege> userPrivilege = userPrivilegeService.getUserPrivilegeById(userId, privilegeId );
         return userPrivilege.map(userPrivilegeMapper::toDto)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
@@ -54,9 +54,9 @@ public class UserPrivilegeController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUserPrivilege(@PathVariable Long id) {
-        logger.warn("Deleting user privilege with id: {}", id);
-        userPrivilegeService.deleteUserPrivilege(id);
+    public ResponseEntity<Void> deleteUserPrivilege(@PathVariable Long userId, @PathVariable Long privilegeId) {
+        // logger.warn("Deleting user privilege with id: {}", id);
+        userPrivilegeService.deleteUserPrivilege(userId, privilegeId);
         return ResponseEntity.noContent().build();
     }
 }

@@ -27,4 +27,6 @@ public interface TradeRepository extends JpaRepository<Trade, Long> , JpaSpecifi
 
     @Query("SELECT t FROM Trade t WHERE t.tradeId = :tradeId AND t.active = true ORDER BY t.version DESC")
     Optional<Trade> findLatestActiveVersionByTradeId(@Param("tradeId") Long tradeId);
+
+    List<Trade> findByTraderUserId(Long userId);
 }
