@@ -1,5 +1,6 @@
 package com.technicalchallenge.service;
 
+import com.technicalchallenge.dto.AdditionalInfoDTO;
 import com.technicalchallenge.dto.CashflowDTO;
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeLegDTO;
@@ -27,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -76,6 +78,9 @@ public class TradeService {
 
     @Autowired
     private AdditionalInfoService additionalInfoService;
+
+    @Autowired
+    private AdditionalInfoRepository additionalInfoRepository;
 
     @Autowired
     private RsqlSpecificationBuilder<Trade> rsqlSpecificationBuilder;
@@ -161,6 +166,19 @@ public class TradeService {
 
         // Create trade legs and cashflows
         createTradeLegsWithCashflows(tradeDTO, savedTrade);
+
+        if(tradeDTO.getAdditionalFields() != null || !tradeDTO.getAdditionalFields().isEmpty()){
+            for(AdditionalInfoDTO additionalInfo : tradeDTO.getAdditionalFields()){
+                if("SETTLEMENT_INSTRUCTIONS".equals(additionalInfo.getFieldName())){
+                    additionalInfo.setEntityId(savedTrade.getId());
+                    additionalInfo.setEntityType("TRADE");
+                    additionalInfo.setFieldType("STRING");
+                    additionalInfoService.addAdditionalInfo(additionalInfo);
+                    
+                    logger.info("Added settlement instructions for new trade with ID", savedTrade.getId());
+                }
+            }
+        }
 
         logger.info("Successfully created trade with ID: {}", savedTrade.getTradeId());
         return savedTrade;
@@ -789,7 +807,7 @@ public class TradeService {
         }
     }
 
-
+//new business rules validation methods
     public ValidationResult validateTradeBusinessRules(TradeDTO tradeDTO){
         LocalDate startDate = tradeDTO.getTradeStartDate();
         LocalDate maturityDate = tradeDTO.getTradeMaturityDate();
@@ -834,7 +852,6 @@ public class TradeService {
         return validationResult;
     }
 
-    
     public ValidationResult validateTradeLegConsistency(List<TradeLegDTO> legs){
         ValidationResult validationResult = new ValidationResult();
         List<String> errorMessages = new ArrayList<>();
@@ -1184,8 +1201,55 @@ public class TradeService {
 
        return cummulativeResult;
    }
-   
 
+   public List<Trade> searchTradesBySettlementInstructions(String searchString){
+    //Additional infos that match the search parameter
+       List<AdditionalInfo> additionalInfoSearchResult = additionalInfoRepository.findActiveByEntityTypeAndFieldNameAndFieldValue( "TRADE", "SETTLEMENT_INSTRUCTIONS", searchString);
+
+       List<Long> tradeIds = additionalInfoSearchResult.stream()
+       .map(AdditionalInfo::getEntityId)
+       .distinct()
+       .collect(Collectors.toList());
+
+       return tradeRepository.findAllById(tradeIds);
+   }
+
+   public Trade updateSettlementInstructions(Long tradeId, String settlementInstructions){
+      
+    Optional<Trade> existingTradeOpt = getTradeById(tradeId);
+        if (existingTradeOpt.isEmpty()) {
+            throw new RuntimeException("Trade not found: " + tradeId);
+        }  
+        
+        Trade existingTrade = existingTradeOpt.get();
+
+     if(settlementInstructions == null || settlementInstructions.trim().isEmpty()){
+        additionalInfoService.removeAdditionalInfo("TRADE", tradeId, "SETTLEMENT_INSTRUCTIONS");
+     } else{
+        AdditionalInfoDTO additionalInfoDTO = new AdditionalInfoDTO();
+        additionalInfoDTO.setEntityId(tradeId);
+        additionalInfoDTO.setEntityType("TRADE");
+        additionalInfoDTO.setFieldName("SETTLEMENT_INSTRUCTIONS");
+        additionalInfoDTO.setFieldValue(settlementInstructions);
+        additionalInfoDTO.setFieldType("STRING");
+
+        additionalInfoService.addAdditionalInfo(additionalInfoDTO);
+
+        logger.info("Settlement instructions saved for trade ID: {}", tradeId);
+     }
+
+     return existingTrade;
+   }
+  
+   public TradeDTO addAdditionalInfo(TradeDTO tradeDTO){
+     if(tradeDTO != null & tradeDTO.getId() != null){
+        List<AdditionalInfoDTO> additionalFields = additionalInfoService.getAdditionalInfoForEntity("TRADE", tradeDTO.getId());
+        tradeDTO.setAdditionalFields(additionalFields);
+     }
+     return tradeDTO;
+   }
+  
+    
   
    
 }

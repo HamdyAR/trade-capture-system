@@ -1,5 +1,6 @@
 package com.technicalchallenge.controller;
 
+import com.technicalchallenge.dto.SettlementInstructionsUpdateDTO;
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeSearchDTO;
 import com.technicalchallenge.mapper.TradeMapper;
@@ -55,6 +56,7 @@ public class TradeController {
         logger.info("Fetching all trades");
         return tradeService.getAllTrades(userId).stream()
                 .map(tradeMapper::toDto)
+                .map(tradeService::addAdditionalInfo)
                 .toList();
     }
 
@@ -74,6 +76,7 @@ public class TradeController {
         logger.debug("Fetching trade by id: {}", id);
         return tradeService.getTradeById(id)
                 .map(tradeMapper::toDto)
+                .map(tradeService::addAdditionalInfo)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -99,6 +102,7 @@ public class TradeController {
             tradeService.populateReferenceDataByName(trade, tradeDTO);
             Trade savedTrade = tradeService.saveTrade(trade, tradeDTO, userId);
             TradeDTO responseDTO = tradeMapper.toDto(savedTrade);
+            responseDTO = tradeService.addAdditionalInfo(responseDTO);
             return ResponseEntity.status(HttpStatus.CREATED).body(responseDTO);
         } catch (Exception e) {
             logger.error("Error creating trade: {}", e.getMessage(), e);
@@ -136,6 +140,7 @@ public class TradeController {
             tradeService.populateReferenceDataByName(trade, tradeDTO);
             Trade savedTrade = tradeService.saveTrade(trade, tradeDTO, userId);
             TradeDTO responseDTO = tradeMapper.toDto(savedTrade);
+            responseDTO = tradeService.addAdditionalInfo(responseDTO);
             return ResponseEntity.ok(responseDTO);
         } catch (Exception e) {
             logger.error("Error updating trade: {}", e.getMessage(), e);
@@ -185,6 +190,7 @@ public class TradeController {
         try {
             Trade terminatedTrade = tradeService.terminateTrade(id, userId);
             TradeDTO responseDTO = tradeMapper.toDto(terminatedTrade);
+            responseDTO = tradeService.addAdditionalInfo(responseDTO);
             return ResponseEntity.ok(responseDTO);
         } catch (Exception e) {
             logger.error("Error terminating trade: {}", e.getMessage(), e);
@@ -236,6 +242,7 @@ public class TradeController {
         logger.info("Searching trade with criteria: {}", searchDTO);
         return tradeService.searchTrade(searchDTO).stream()
                 .map(tradeMapper::toDto)
+                .map(tradeService::addAdditionalInfo)
                 .toList();
     }
 
@@ -276,11 +283,8 @@ public class TradeController {
         Page<Trade> tradePage = tradeService.filterTradeWithPagination(searchDTO, pageable);
 
 
-        return tradePage.map(tradeMapper::toDto);
+        return tradePage.map(tradeMapper::toDto).map(tradeService::addAdditionalInfo);
     }
-
-
-
 
 
 
@@ -317,8 +321,59 @@ public class TradeController {
         
         Page<Trade> tradePage = tradeService.searchTradeWithRsql(query, pageable);
 
-        return tradePage.map(tradeMapper::toDto);
+        return tradePage.map(tradeMapper::toDto).map(tradeService::addAdditionalInfo);
     }
+
+
+    @GetMapping("/search/settlement-instructions")
+     @Operation(summary = "Search trades by settlement instructions",
+               description = "Retrieves a list of trades that contain the specified text in their settlement instructions.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved trades that match settlement instructions",
+                    content = @Content(mediaType = "application/json",
+                                     schema = @Schema(implementation = TradeDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid search parameter"),                            
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })    
+    public ResponseEntity<List<TradeDTO>> searchBySettlementInstructions(
+        @Parameter(description = "Setllement instructions string", required=true) 
+    @RequestParam String instructions) {
+    // Search trades by settlement instruction content
+    
+       List<TradeDTO> trades = tradeService.searchTradesBySettlementInstructions(instructions).stream()
+                .map(tradeMapper::toDto)
+                .map(tradeService::addAdditionalInfo)
+                .toList();
+          return ResponseEntity.ok(trades);
+        
+    }
+
+
+    @PutMapping("/{id}/settlement-instructions")
+    @Operation(summary = "Updates settlement instructions for a trade",
+               description = "Updates an existing trade with new settlement instructions.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved trades that match settlement instructions",
+                    content = @Content(mediaType = "application/json",
+                                     schema = @Schema(implementation = TradeDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid request"),
+        @ApiResponse(responseCode = "404", description = "Trade not found with provided ID"),                             
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })    
+    public ResponseEntity<?> updateSettlementInstructions(
+        @PathVariable Long id, 
+        @Valid @RequestBody SettlementInstructionsUpdateDTO request) {
+    // Update settlement instructions for existing trades
+            Trade updatedTrade = tradeService.updateSettlementInstructions(id, request.getInstructions());
+            logger.info("Settlment instructions successfully updated for trade with trade ID:{}", id);
+
+            updatedTrade = tradeService.getTradeById(id).orElseThrow(() -> new RuntimeException("Trade not found after update"));
+
+            TradeDTO tradeDTO = tradeMapper.toDto(updatedTrade);
+            tradeDTO = tradeService.addAdditionalInfo(tradeDTO);
+            return ResponseEntity.ok(tradeDTO);
+}
+
 }    
 
    
