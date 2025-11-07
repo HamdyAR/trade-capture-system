@@ -97,7 +97,7 @@ public class TradeService {
               throw new UnauthorizedAccessException("User does not have permission to view trades");
         }
 
-        Optional<ApplicationUser> userOpt = applicationUserRepository.findByLoginId(userId);
+        Optional<ApplicationUser> userOpt = applicationUserRepository.findByLoginIdIgnoreCase(userId);
         if(userOpt.isEmpty()){
             throw new RuntimeException("User not found " + userId);
         }
@@ -167,7 +167,7 @@ public class TradeService {
         // Create trade legs and cashflows
         createTradeLegsWithCashflows(tradeDTO, savedTrade);
 
-        if(tradeDTO.getAdditionalFields() != null || !tradeDTO.getAdditionalFields().isEmpty()){
+        if(tradeDTO.getAdditionalFields() != null && !tradeDTO.getAdditionalFields().isEmpty()){
             for(AdditionalInfoDTO additionalInfo : tradeDTO.getAdditionalFields()){
                 if("SETTLEMENT_INSTRUCTIONS".equals(additionalInfo.getFieldName())){
                     additionalInfo.setEntityId(savedTrade.getId());
@@ -241,14 +241,14 @@ public class TradeService {
             if (nameParts.length >= 1) {
                 String firstName = nameParts[0];
                 logger.debug("Searching for user with firstName: {}", firstName);
-                Optional<ApplicationUser> userOpt = applicationUserRepository.findByFirstName(firstName);
+                Optional<ApplicationUser> userOpt = applicationUserRepository.findByFirstNameIgnoreCase(firstName);
                 if (userOpt.isPresent()) {
                     trade.setTraderUser(userOpt.get());
                     logger.debug("Found trader user: {} {}", userOpt.get().getFirstName(), userOpt.get().getLastName());
                 } else {
                     logger.warn("Trader user not found with firstName: {}", firstName);
                     // Try with loginId as fallback
-                    Optional<ApplicationUser> byLoginId = applicationUserRepository.findByLoginId(tradeDTO.getTraderUserName().toLowerCase());
+                    Optional<ApplicationUser> byLoginId = applicationUserRepository.findByLoginIdIgnoreCase(tradeDTO.getTraderUserName().toLowerCase());
                     if (byLoginId.isPresent()) {
                         trade.setTraderUser(byLoginId.get());
                         logger.debug("Found trader user by loginId: {}", tradeDTO.getTraderUserName());
@@ -269,14 +269,14 @@ public class TradeService {
             if (nameParts.length >= 1) {
                 String firstName = nameParts[0];
                 logger.debug("Searching for inputter with firstName: {}", firstName);
-                Optional<ApplicationUser> userOpt = applicationUserRepository.findByFirstName(firstName);
+                Optional<ApplicationUser> userOpt = applicationUserRepository.findByFirstNameIgnoreCase(firstName);
                 if (userOpt.isPresent()) {
                     trade.setTradeInputterUser(userOpt.get());
                     logger.debug("Found inputter user: {} {}", userOpt.get().getFirstName(), userOpt.get().getLastName());
                 } else {
                     logger.warn("Inputter user not found with firstName: {}", firstName);
                     // Try with loginId as fallback
-                    Optional<ApplicationUser> byLoginId = applicationUserRepository.findByLoginId(tradeDTO.getInputterUserName().toLowerCase());
+                    Optional<ApplicationUser> byLoginId = applicationUserRepository.findByLoginIdIgnoreCase(tradeDTO.getInputterUserName().toLowerCase());
                     if (byLoginId.isPresent()) {
                         trade.setTradeInputterUser(byLoginId.get());
                         logger.debug("Found inputter user by loginId: {}", tradeDTO.getInputterUserName());
@@ -343,6 +343,8 @@ public class TradeService {
 
         Trade existingTrade = existingTradeOpt.get();
         TradeDTO existingTradeDTO = tradeMapper.toDto(existingTrade);
+
+        logger.info("Trade with trader {} to be amended", existingTradeDTO.getTraderUserName());
 
         if(!validateUserPrivileges(userId, "amendTrade", existingTradeDTO)){
            throw new UnauthorizedAccessException("User does not have permission to amend this trade");
@@ -422,7 +424,7 @@ public class TradeService {
 
         TradeDTO tradeDTO = tradeMapper.toDto(trade);
 
-        if(!validateUserPrivileges(userId, "terminateTrade", tradeDTO)){
+        if(!validateUserPrivileges(userId, "cancelTrade", tradeDTO)){
               throw new UnauthorizedAccessException("User does not have permission to cancel this trade");
         }
 
@@ -937,7 +939,13 @@ public class TradeService {
 
     public boolean validateUserPrivileges(String userId, String operation, TradeDTO tradeDTO){
 
-        Optional<ApplicationUser> userOpt = applicationUserRepository.findByLoginId(userId);
+         logger.info("User id: {}", userId);
+
+        Optional<ApplicationUser> userOpt = applicationUserRepository.findByLoginIdIgnoreCase(userId);
+        
+        System.out.println(userId);
+        System.out.println(userOpt);
+
 
         logger.info("User optional: {}", userOpt);
 
@@ -952,13 +960,24 @@ public class TradeService {
             return false;
         }
 
+         logger.info("User active: {}", user.isActive());
+
         String privilegeName = mapOperationToPrivilege(operation);
         
         if(privilegeName == null){
             return false;
         }
 
+        logger.info("Privilege name: {}", privilegeName);
+
         Optional<Privilege> privilegeOpt = privilegeRepository.findByName(privilegeName);
+
+        logger.info("All Privileges: {}", privilegeRepository.findAll());
+
+        logger.info("All User Privileges: {}", userPrivilegeRepository.findAll());
+       
+        logger.info("Privilege opt: {}", privilegeOpt);
+
         if(privilegeOpt.isEmpty()){
             return false;
         }
@@ -1005,9 +1024,17 @@ public class TradeService {
         }
 
         String tradeOwner = tradeDTO.getTraderUserName();
-        String currentUserName = user.getFirstName() + " " + user.getLastName();
+        // String currentUserName = user.getFirstName() + " " + user.getLastName();
 
-        return tradeOwner == null || tradeOwner.equalsIgnoreCase(currentUserName);
+        logger.info("Trade owner: {}", tradeOwner);
+        
+        String[] nameParts = tradeOwner.split("\\s+");
+        String firstName = "";
+            if(nameParts.length >= 1){
+                firstName = nameParts[0];
+            }
+
+        return tradeOwner == null || firstName.equalsIgnoreCase(user.getLoginId());
     }
 
     public ValidationResult validateReferenceDataStatus(TradeDTO tradeDTO){
@@ -1043,20 +1070,20 @@ public class TradeService {
         }
 
         //3. Validate trader user exists and check if it is active
-        if(tradeDTO.getTraderUserName() != null){
+        if(tradeDTO.getTraderUserName() != null || !tradeDTO.getTraderUserName().trim().isEmpty()){
             String[] nameParts = tradeDTO.getTraderUserName().split("\\s+");
-            if(nameParts.length >= 1){
+            if(nameParts.length >= 1 && !nameParts[0].isEmpty()){
                 String firstName = nameParts[0];
-                Optional<ApplicationUser> userOpt = applicationUserRepository.findByFirstName(firstName);
+                Optional<ApplicationUser> userOpt = applicationUserRepository.findByFirstNameIgnoreCase(firstName);
                 if(userOpt.isEmpty()){
-                    errorMessages.add("Trader user " + tradeDTO.getTraderUserName() + " does not exist");
+                    errorMessages.add("Trader: " + tradeDTO.getTraderUserName() + " does not exist");
                 }
                 else if(!userOpt.get().isActive()){
-                    errorMessages.add("Trader user " + tradeDTO.getTraderUserName() +  " is not active");
+                    errorMessages.add("Trader: " + tradeDTO.getTraderUserName() +  " is not active");
                 }
             }
         }else{
-            errorMessages.add("Trader user is required");
+            errorMessages.add("Trader is required");
         } 
         
         //4. Validate trade status
@@ -1175,7 +1202,7 @@ public class TradeService {
          allErrorMessages.addAll(businessRulesResult.getErrors());
        }
 
-       if(tradeDTO.getTradeLegs() != null && !tradeDTO.getTradeLegs().isEmpty()){
+       if(tradeDTO.getTradeLegs() != null && !tradeDTO.getTradeLegs().isEmpty() && tradeDTO.getTradeLegs().size() == 2){
          TradeLegDTO leg1 = tradeDTO.getTradeLegs().get(0);
          TradeLegDTO leg2 = tradeDTO.getTradeLegs().get(1);
 
@@ -1188,7 +1215,7 @@ public class TradeService {
            }
        }
        else{
-          allErrorMessages.add("Trade must have 2 legs");
+          allErrorMessages.add("Trade must have exactly 2 legs");
        }
 
        if(allErrorMessages.isEmpty()){
@@ -1202,6 +1229,9 @@ public class TradeService {
        return cummulativeResult;
    }
 
+
+
+    //settlement instructions logic
    public List<Trade> searchTradesBySettlementInstructions(String searchString){
     //Additional infos that match the search parameter
        List<AdditionalInfo> additionalInfoSearchResult = additionalInfoRepository.findActiveByEntityTypeAndFieldNameAndFieldValue( "TRADE", "SETTLEMENT_INSTRUCTIONS", searchString);
@@ -1242,14 +1272,11 @@ public class TradeService {
    }
   
    public TradeDTO addAdditionalInfo(TradeDTO tradeDTO){
-     if(tradeDTO != null & tradeDTO.getId() != null){
+     if(tradeDTO != null && tradeDTO.getId() != null){
         List<AdditionalInfoDTO> additionalFields = additionalInfoService.getAdditionalInfoForEntity("TRADE", tradeDTO.getId());
         tradeDTO.setAdditionalFields(additionalFields);
      }
      return tradeDTO;
    }
   
-    
-  
-   
 }

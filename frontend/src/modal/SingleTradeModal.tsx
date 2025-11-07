@@ -11,6 +11,8 @@ import {getDefaultTrade, validateTrade, formatTradeForBackend, convertEmptyStrin
 import {formatDatesFromBackend} from "../utils/dateUtils";
 import LoadingSpinner from "../components/LoadingSpinner";
 import userStore from "../stores/userStore";
+import Input from "../components/Input";
+import Label from "../components/Label";
 
 /**
  * Props for SingleTradeModal component
@@ -35,7 +37,22 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
     const [loading, setLoading] = React.useState(false);
 
     React.useEffect(() => {
-        setEditableTrade(props.trade ?? getDefaultTrade());
+        if(props.trade){
+            const settlementField = Array.isArray(props.trade.additionalFields)
+            ? props.trade.additionalFields.find((f: any) =>f && typeof f === "object" && f.fieldName === "SETTLEMENT_INSTRUCTIONS")
+            : undefined;
+
+            const settlementInstructions = settlementField && settlementField.fieldValue ? settlementField.fieldValue : '';
+
+            setEditableTrade({
+               ...props.trade,
+               settlementInstructions, 
+            });
+        }else{
+            setEditableTrade(getDefaultTrade());
+        }
+    
+        // setEditableTrade(props.trade ?? getDefaultTrade());
         setCashflowModalOpen(false);
         setGeneratedCashflows([]);
         setSnackbarOpen(false);
@@ -227,6 +244,7 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
 
 
     const tradeLegs = editableTrade?.tradeLegs ? editableTrade.tradeLegs.slice(0, 2) : [];
+    const settlementInstructions = editableTrade?.settlementInstructions  ? editableTrade.settlementInstructions : '';
 
     return (
         <div className={"flex flex-col"}>
@@ -245,6 +263,25 @@ export const SingleTradeModal: React.FC<SingleTradeModalProps> = (props) => {
                             mode={props.mode}
                             onFieldChange={props.mode === 'edit' ? handleFieldChange : undefined}
                         />
+                        {props.mode === 'edit' && (
+                            <div>
+                                <h3 className="mt-2 text-lg font-semibold text-center mb-2">Settlement Instructions</h3>
+                                <div className="mt-2 bg-violet-100 rounded shadow">
+                                
+                                    <div>
+                                     <Input
+                                     value={settlementInstructions || ""}
+                                     className="m-2 bg-white"
+                                     onChange={(e) => handleFieldChange("settlementInstructions", e.target.value)}
+                                     placeholder="Enter settlement instructions"
+                                     />
+                                    </div> 
+                                
+                                </div>    
+                            </div>  
+                        )}
+                       
+
                     </div>
                     {tradeLegs.length > 0 && (
                         <div className="flex flex-row gap-x-8 h-fit justify-center mt-0">

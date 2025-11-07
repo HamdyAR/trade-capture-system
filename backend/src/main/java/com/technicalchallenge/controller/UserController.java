@@ -69,7 +69,7 @@ public class UserController {
             @PathVariable("loginId") String loginId) {
         logger.debug("Fetching user by loginId: {}", loginId);
         Optional<ApplicationUser> user = applicationUserService.getAllUsers().stream()
-                .filter(u -> u.getLoginId().equals(loginId))
+                .filter(u -> u.getLoginId().equalsIgnoreCase(loginId))
                 .findFirst();
 
         return user.map(applicationUserMapper::toDto)

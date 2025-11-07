@@ -45,7 +45,9 @@ export const getDefaultTrade = (): Trade => JSON.parse(JSON.stringify({
             paymentBusinessDayConvention: 'Modified Following',
             payReceiveFlag: 'Receive',
         }
-    ]
+    ],
+    settlementInstructions: '',
+    additionalFields:[]
 }));
 
 /**
@@ -68,6 +70,12 @@ export const formatTradeForBackend = (trade: Trade): Record<string, unknown> => 
         tradeLegs: trade.tradeLegs.map(leg => ({
             ...leg,
         })),
+        additionalFields:[{
+            fieldName: "SETTLEMENT_INSTRUCTIONS",
+            fieldValue: trade.settlementInstructions || "",
+            fieldType:"STRING",
+            entityType: "TRADE"
+        }]
     };
 };
 
@@ -105,9 +113,18 @@ export const validateTrade = (trade: Trade): string | null => {
  * @param obj - Object to convert
  * @returns {Object} Converted object
  */
-export function convertEmptyStringsToNull(obj: Record<string, unknown> | unknown[] | unknown): Record<string, unknown> | unknown[] | unknown {
+export function convertEmptyStringsToNull(obj: Record<string, unknown> | unknown[] | unknown, seen = new WeakSet()): Record<string, unknown> | unknown[] | unknown {
+    if(obj == null  || obj === undefined) return obj;
+
+    if(typeof obj === "object"){
+        if(seen.has(obj)) return obj;//prevents infinite recursion
+        seen.add(obj);
+    }
+
+
+
     if (Array.isArray(obj)) {
-        return obj.map(convertEmptyStringsToNull);
+        return obj.map(o => convertEmptyStringsToNull(o, seen));
     } else if (obj && typeof obj === 'object') {
         const newObj: Record<string, unknown> = {};
         for (const key in obj as Record<string, unknown>) {

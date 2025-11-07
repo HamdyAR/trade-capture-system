@@ -2,6 +2,7 @@ package com.technicalchallenge.dto;
 
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -12,6 +13,7 @@ import lombok.NoArgsConstructor;
 
 public class SettlementInstructionsUpdateDTO {
 
+    @NotNull(message = "Settlement instructions cannot be null")
     @Size(min = 10, max = 500, message = "Settlement instructions must be between 10 and 500 characters")
     @Pattern(
         regexp = "^[\\p{L}\\p{N}\\s.,:'\\-]+$",

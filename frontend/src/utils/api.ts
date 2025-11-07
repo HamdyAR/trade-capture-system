@@ -1,12 +1,22 @@
 import axios from 'axios';
+import { config } from 'process';
+import userStore from '../stores/userStore';
 
 const api = axios.create({
   baseURL: 'http://localhost:8080/api',
   timeout: 10000,
   headers: {
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/json'
   },
 });
+
+api.interceptors.request.use(config => {
+   const userId = userStore.user?.loginId;
+   if(userId){
+      config.headers["X-User-Id"] = userId;
+   }
+   return config;
+}, error => Promise.reject(error));
 
 
 export const fetchTrades = () => api.get('/trades');
