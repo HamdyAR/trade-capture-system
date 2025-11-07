@@ -86,12 +86,14 @@ public class TradeControllerTest {
         // Set up default mappings
         when(tradeMapper.toDto(any(Trade.class))).thenReturn(tradeDTO);
         when(tradeMapper.toEntity(any(TradeDTO.class))).thenReturn(trade);
+        when(tradeService.addAdditionalInfo(any(TradeDTO.class))).thenReturn(tradeDTO);
         
         searchDTO = new TradeSearchDTO();
         searchDTO.setBook(tradeDTO.getBookName());
         searchDTO.setCounterparty(tradeDTO.getCounterpartyName());
         searchDTO.setTradeStatus(tradeDTO.getTradeStatus());
-
+ 
+        user = new ApplicationUser();
         user.setLoginId("simon");
         user.setActive(true);
     }
@@ -101,10 +103,11 @@ public class TradeControllerTest {
         // Given
         List<Trade> trades = List.of(trade); // Fixed: use List.of instead of Arrays.asList for single item
 
-        when(tradeService.getAllTrades(any(ApplicationUser.class).getLoginId())).thenReturn(trades);
+        when(tradeService.getAllTrades(anyString())).thenReturn(trades);
 
         // When/Then
         mockMvc.perform(get("/api/trades")
+                        .header("X-User-Id", "simon")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
@@ -112,13 +115,14 @@ public class TradeControllerTest {
                 .andExpect(jsonPath("$[0].bookName", is("TestBook")))
                 .andExpect(jsonPath("$[0].counterpartyName", is("TestCounterparty")));
 
-        verify(tradeService).getAllTrades(any(ApplicationUser.class).getLoginId());
+        verify(tradeService).getAllTrades(anyString());
     }
 
     @Test
     void testGetTradeById() throws Exception {
         // Given
         when(tradeService.getTradeById(1001L)).thenReturn(Optional.of(trade));
+        
 
         // When/Then
         mockMvc.perform(get("/api/trades/1001")
@@ -147,17 +151,18 @@ public class TradeControllerTest {
     @Test
     void testCreateTrade() throws Exception {
         // Given
-        when(tradeService.saveTrade(any(Trade.class), any(TradeDTO.class), any(ApplicationUser.class).getLoginId())).thenReturn(trade);
+        when(tradeService.saveTrade(any(Trade.class), any(TradeDTO.class), anyString())).thenReturn(trade);
         doNothing().when(tradeService).populateReferenceDataByName(any(Trade.class), any(TradeDTO.class));
 
         // When/Then
         mockMvc.perform(post("/api/trades")
+                        .header("X-User-Id", "simon")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(tradeDTO)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.tradeId", is(1001)));
 
-        verify(tradeService).saveTrade(any(Trade.class), any(TradeDTO.class), any(ApplicationUser.class).getLoginId());
+        verify(tradeService).saveTrade(any(Trade.class), any(TradeDTO.class), anyString());
         verify(tradeService).populateReferenceDataByName(any(Trade.class), any(TradeDTO.class));
     }
 
@@ -176,7 +181,7 @@ public class TradeControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string("Trade date is required"));
 
-        verify(tradeService, never()).saveTrade(any(Trade.class), any(TradeDTO.class), any(ApplicationUser.class).getLoginId());
+        verify(tradeService, never()).saveTrade(any(Trade.class), any(TradeDTO.class), anyString());
     }
 
     @Test
@@ -194,7 +199,7 @@ public class TradeControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string("Book and Counterparty are required"));
 
-        verify(tradeService, never()).saveTrade(any(Trade.class), any(TradeDTO.class), any(ApplicationUser.class).getLoginId());
+        verify(tradeService, never()).saveTrade(any(Trade.class), any(TradeDTO.class), anyString());
     }
 
     @Test
@@ -202,17 +207,18 @@ public class TradeControllerTest {
         // Given
         Long tradeId = 1001L;
         tradeDTO.setTradeId(tradeId);
-        when(tradeService.saveTrade(any(Trade.class), any(TradeDTO.class), any(ApplicationUser.class).getLoginId())).thenReturn(trade);
+        when(tradeService.saveTrade(any(Trade.class), any(TradeDTO.class), anyString())).thenReturn(trade);
         doNothing().when(tradeService).populateReferenceDataByName(any(Trade.class), any(TradeDTO.class));
 
         // When/Then
         mockMvc.perform(put("/api/trades/{id}", tradeId)
+                        .header("X-User-Id", "simon")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(tradeDTO)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tradeId", is(1001)));
 
-        verify(tradeService).saveTrade(any(Trade.class), any(TradeDTO.class) , any(ApplicationUser.class).getLoginId());
+        verify(tradeService).saveTrade(any(Trade.class), any(TradeDTO.class) , anyString());
     }
 
     @Test
@@ -223,12 +229,13 @@ public class TradeControllerTest {
 
         // When/Then
         mockMvc.perform(put("/api/trades/{id}", pathId)
+                        .header("X-User-Id", "simon")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(tradeDTO)))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string("Trade ID in path must match Trade ID in request body"));
 
-        verify(tradeService, never()).saveTrade(any(Trade.class), any(TradeDTO.class), any(ApplicationUser.class).getLoginId());
+        verify(tradeService, never()).saveTrade(any(Trade.class), any(TradeDTO.class), anyString());
     }
 
     @Test
@@ -238,6 +245,7 @@ public class TradeControllerTest {
 
         // When/Then
         mockMvc.perform(delete("/api/trades/1001")
+                       .header("X-User-Id", "simon")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
@@ -257,7 +265,7 @@ public class TradeControllerTest {
                         .content(objectMapper.writeValueAsString(invalidDTO)))
                 .andExpect(status().isBadRequest());
 
-        verify(tradeService, never()).createTrade(any(TradeDTO.class), any(ApplicationUser.class).getLoginId());
+        verify(tradeService, never()).createTrade(any(TradeDTO.class), anyString());
     }
 
      @Test

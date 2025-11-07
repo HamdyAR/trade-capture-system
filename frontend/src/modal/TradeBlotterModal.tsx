@@ -22,9 +22,25 @@ export const TradeBlotterModal: React.FC = observer(() => {
 
     React.useEffect(() => {
         if (isSuccess && data) {
-            setTrades(data);
+            const mappedData = (data as Trade[]).map((item: Trade) => {
+                const settlementField = Array.isArray(item.additionalFields)
+            ? item.additionalFields.find((f: any) =>f && typeof f === "object" && f.fieldName === "SETTLEMENT_INSTRUCTIONS")
+            : undefined;
+
+            const settlementInstructions = settlementField && settlementField.fieldValue ? settlementField.fieldValue : '';
+
+            return{
+                ...item,
+                settlementInstructions
+            }
+            })
+
+
+
+            setTrades(mappedData);
         }
     }, [isSuccess, data]);
+    console.log(data);
 
     const columnDefs = getColDefFromResult(trades);
     const rowData = getRowDataFromData(trades);

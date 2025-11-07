@@ -29,8 +29,10 @@ export interface Trade {
   lastTouchTimestamp?: string;
   validityStartDate?: string;
   tradeLegs: TradeLeg[];
+  settlementInstructions: string;
   [key: string]: unknown;
 }
+
 
 export interface CashflowDTO {
   id?: number;

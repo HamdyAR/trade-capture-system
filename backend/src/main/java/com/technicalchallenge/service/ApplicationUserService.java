@@ -20,7 +20,7 @@ public class ApplicationUserService {
 
     public boolean validateCredentials(String loginId, String password) {
         logger.debug("Validating credentials for user: {}", loginId);
-        Optional<ApplicationUser> user = applicationUserRepository.findByLoginId(loginId);
+        Optional<ApplicationUser> user = applicationUserRepository.findByLoginIdIgnoreCase(loginId);
         return user.map(applicationUser -> applicationUser.getPassword().equals(password)).orElse(false);
     }
 
@@ -36,7 +36,7 @@ public class ApplicationUserService {
 
     public Optional<ApplicationUser> getUserByLoginId(String loginId) {
         logger.debug("Retrieving user by login id: {}", loginId);
-        return applicationUserRepository.findByLoginId(loginId);
+        return applicationUserRepository.findByLoginIdIgnoreCase(loginId);
     }
 
     public ApplicationUser saveUser(ApplicationUser user) {

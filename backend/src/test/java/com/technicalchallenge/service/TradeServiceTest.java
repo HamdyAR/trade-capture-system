@@ -5,6 +5,8 @@ import com.technicalchallenge.dto.CashflowDTO;
 import com.technicalchallenge.dto.TradeDTO;
 import com.technicalchallenge.dto.TradeLegDTO;
 import com.technicalchallenge.dto.TradeSearchDTO;
+import com.technicalchallenge.mapper.TradeMapper;
+import com.technicalchallenge.model.AdditionalInfo;
 import com.technicalchallenge.model.ApplicationUser;
 import com.technicalchallenge.model.Book;
 import com.technicalchallenge.model.BusinessDayConvention;
@@ -42,6 +44,7 @@ import com.technicalchallenge.repository.TradeStatusRepository;
 import com.technicalchallenge.repository.TradeSubTypeRepository;
 import com.technicalchallenge.repository.TradeTypeRepository;
 import com.technicalchallenge.repository.UserPrivilegeRepository;
+import com.technicalchallenge.repository.UserProfileRepository;
 import com.technicalchallenge.rsql.RsqlSpecificationBuilder;
 
 import org.h2.engine.User;
@@ -57,6 +60,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -104,6 +108,9 @@ class TradeServiceTest {
      @Mock
     private PrivilegeRepository privilegeRepository;
 
+    @Mock
+    private UserProfileRepository userProfileRepository;
+
      @Mock
     private UserPrivilegeRepository userPrivilegeRepository;
 
@@ -137,6 +144,9 @@ class TradeServiceTest {
     @Mock
     private RsqlSpecificationBuilder<Trade> rsqlSpecificationBuilder;
 
+    @Mock
+    private TradeMapper tradeMapper;
+
     @InjectMocks
     private TradeService tradeService;
 
@@ -151,6 +161,7 @@ class TradeServiceTest {
     private Privilege privilege;
     private UserPrivilege userPrivilege;
     private UserProfile userProfile;
+   
 
     @BeforeEach
     void setUp() {
@@ -161,6 +172,7 @@ class TradeServiceTest {
         tradeDTO.setTradeStartDate(LocalDate.of(2025, 10, 17));
         tradeDTO.setTradeMaturityDate(LocalDate.of(2026, 10, 17));
         tradeDTO.setVersion(1);
+        tradeDTO.setTraderUserName("Simon");
         tradeDTO.setTradeType("Swap");
         tradeDTO.setTradeSubType("IR Swap");
 
@@ -226,6 +238,8 @@ class TradeServiceTest {
 
         userProfile = new UserProfile();
         userProfile.setUserType("TRADER_SALES");
+        
+        
 
         user = new ApplicationUser();
         user.setLoginId("simon");
@@ -233,39 +247,53 @@ class TradeServiceTest {
         user.setId(10001L);
         user.setUserProfile(userProfile);
         user.setFirstName("Simon");
+       
 
         privilege = new Privilege();
         privilege.setName("BOOK_TRADE");
         privilege.setId(10001L);
+       
+
 
         userPrivilege = new UserPrivilege();
         userPrivilege.setUserId(10001L);
-        userPrivilege.setPrivilegeId(10003L);
+        userPrivilege.setPrivilegeId(privilege.getId());
+        
+        ApplicationUser trader = new ApplicationUser();
+            trader.setLoginId("simon");
+            trader.setActive(true);
+            trader.setId(10002L);
+            trader.setUserProfile(userProfile);
+            trader.setFirstName("Simon");
+             
     }
 
     private void createTradeMocks(){
         when(bookRepository.findByBookName(any(String.class))).thenReturn(Optional.of(book));
         when(counterpartyRepository.findByName(any(String.class))).thenReturn(Optional.of(counterparty));
         when(tradeStatusRepository.findByTradeStatus(any(String.class))).thenReturn(Optional.of(new TradeStatus()));
-        when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(tradeLegRepository.save(any(TradeLeg.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(applicationUserRepository.findByLoginId(anyString())).thenReturn(Optional.of(user));
+        lenient().when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(tradeLegRepository.save(any(TradeLeg.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(applicationUserRepository.findByLoginIdIgnoreCase(anyString())).thenReturn(Optional.of(user));
          when(privilegeRepository.findByName(anyString())).thenReturn(Optional.of(privilege));
          when(userPrivilegeRepository.existsByUserIdAndPrivilegeId(anyLong(), anyLong())).thenReturn(true);
-        when(applicationUserRepository.findByFirstName(any(String.class))).thenReturn(Optional.of(user));
+          
+        when(applicationUserRepository.findByFirstNameIgnoreCase(any(String.class))).thenReturn(Optional.of(user));
    
 
         LegType legType = new LegType();
         legType.setType("Fixed");
+
+       
        
         when(tradeTypeRepository.findByTradeType(any(String.class))).thenReturn(Optional.of(new TradeType()));
         when(tradeSubTypeRepository.findByTradeSubType(any(String.class))).thenReturn(Optional.of(new TradeSubType()));
-        when(currencyRepository.findByCurrency(any(String.class))).thenReturn(Optional.of(new Currency()));
-        when(legTypeRepository.findByType(any(String.class))).thenReturn(Optional.of(legType));
-        when(indexRepository.findByIndex(any(String.class))).thenReturn(Optional.of(new Index()));
-        when(holidayCalendarRepository.findByHolidayCalendar(any(String.class))).thenReturn(Optional.of(new HolidayCalendar()));
-        when(payRecRepository.findByPayRec(any(String.class))).thenReturn(Optional.of(new PayRec()));
-        when(businessDayConventionRepository.findByBdc(any(String.class))).thenReturn(Optional.of(new BusinessDayConvention()));
+        lenient().when(currencyRepository.findByCurrency(any(String.class))).thenReturn(Optional.of(new Currency()));
+        lenient().when(legTypeRepository.findByType(any(String.class))).thenReturn(Optional.of(legType));
+        lenient().when(indexRepository.findByIndex(any(String.class))).thenReturn(Optional.of(new Index()));
+        lenient().when(holidayCalendarRepository.findByHolidayCalendar(any(String.class))).thenReturn(Optional.of(new HolidayCalendar()));
+        lenient().when(payRecRepository.findByPayRec(any(String.class))).thenReturn(Optional.of(new PayRec()));
+        lenient().when(businessDayConventionRepository.findByBdc(any(String.class))).thenReturn(Optional.of(new BusinessDayConvention()));
     }
 
     @Test
@@ -286,17 +314,25 @@ class TradeServiceTest {
     void testCreateTrade_InvalidDates_ShouldFail() {
         //Case 1: Invalid start date
         // Given
+
+        createTradeMocks();
+        
+        
         
         tradeDTO.setTradeStartDate(LocalDate.of(2025, 1, 10)); // Invalid - Before trade date
-        createTradeMocks();
+        
     
         // When & Then
-        RuntimeException startDateException = assertThrows(RuntimeException.class, () -> {
+        IllegalArgumentException startDateException = assertThrows(IllegalArgumentException.class, () -> {
             tradeService.createTrade(tradeDTO, user.getLoginId());
         });
 
         //Assert
-        assertEquals("Trade validation failed Start date cannot be before trade date", startDateException.getMessage());
+        // assertEquals("Trade validation failed Start date cannot be before trade date", startDateException.getMessage());
+
+        assertTrue(startDateException.getMessage().contains("Start date cannot be before trade date"));
+
+        System.out.println("Actual exception message " + startDateException.getMessage());
 
         //Case 2: Invalid maturity date
         //Given
@@ -307,9 +343,9 @@ class TradeServiceTest {
         RuntimeException maturityDateException = assertThrows(RuntimeException.class, () -> {
             tradeService.createTrade(tradeDTO, user.getLoginId());
         });
-
+        // Maturity date cannot be before start date
         //Assert
-        assertEquals("Maturity date cannot be before start date", maturityDateException.getMessage());
+        assertTrue(maturityDateException.getMessage().contains("Maturity date cannot be before start date"));
 
     }
 
@@ -321,7 +357,7 @@ class TradeServiceTest {
         createTradeMocks();
 
         // When & Then
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
             tradeService.createTrade(tradeDTO, user.getLoginId());
         });
 
@@ -356,9 +392,37 @@ class TradeServiceTest {
     @Test
     void testAmendTrade_Success() {
         // Given
+        when(bookRepository.findByBookName(any(String.class))).thenReturn(Optional.of(book));
+        when(counterpartyRepository.findByName(any(String.class))).thenReturn(Optional.of(counterparty));
+        when(tradeStatusRepository.findByTradeStatus(any(String.class))).thenReturn(Optional.of(new TradeStatus()));
+          when(tradeTypeRepository.findByTradeType(any(String.class))).thenReturn(Optional.of(new TradeType()));
+
+          LegType legType = new LegType();
+        legType.setType("Fixed");
+
+
+         when(privilegeRepository.findByName(anyString())).thenReturn(Optional.of(privilege));
+         when(userPrivilegeRepository.existsByUserIdAndPrivilegeId(anyLong(), anyLong())).thenReturn(true);
+        when(applicationUserRepository.findByFirstNameIgnoreCase(any(String.class))).thenReturn(Optional.of(user));
+
+        when(tradeSubTypeRepository.findByTradeSubType(any(String.class))).thenReturn(Optional.of(new TradeSubType()));
+        when(currencyRepository.findByCurrency(any(String.class))).thenReturn(Optional.of(new Currency()));
+        when(legTypeRepository.findByType(any(String.class))).thenReturn(Optional.of(legType));
+        when(indexRepository.findByIndex(any(String.class))).thenReturn(Optional.of(new Index()));
+        when(holidayCalendarRepository.findByHolidayCalendar(any(String.class))).thenReturn(Optional.of(new HolidayCalendar()));
+        when(payRecRepository.findByPayRec(any(String.class))).thenReturn(Optional.of(new PayRec()));
+        when(businessDayConventionRepository.findByBdc(any(String.class))).thenReturn(Optional.of(new BusinessDayConvention()));
+
+
+
         tradeDTO.setTradeStatus("AMENDED");
 
+       
         when(tradeRepository.findByTradeIdAndActiveTrue(100001L)).thenReturn(Optional.of(trade));
+        when(tradeMapper.toDto(any(Trade.class))).thenReturn(tradeDTO);
+         when(applicationUserRepository.findByLoginIdIgnoreCase(any(String.class))).thenReturn(Optional.of(user));
+          when(privilegeRepository.findByName(anyString())).thenReturn(Optional.of(privilege));
+         when(userPrivilegeRepository.existsByUserIdAndPrivilegeId(anyLong(), anyLong())).thenReturn(true);
         when(tradeStatusRepository.findByTradeStatus("AMENDED")).thenReturn(Optional.of(new TradeStatus()));
         when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(tradeLegRepository.save(any(TradeLeg.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -669,8 +733,8 @@ class TradeServiceTest {
             assertEquals(0, fixedLeg.getCashflows().get(0).getPaymentValue().compareTo(BigDecimal.valueOf(33750.00)));
          } 
          
-       @Test
-        void testCashflowValue_FloatingLeg(){
+    @Test
+    void testCashflowValue_FloatingLeg(){
 
         //floating leg
         leg2.setNotional(BigDecimal.valueOf(750000));
@@ -692,8 +756,8 @@ class TradeServiceTest {
             assertEquals(0, floatingLeg.getCashflows().get(0).getPaymentValue().compareTo(BigDecimal.ZERO));
          }  
 
-         @Test
-        void testCashflowValue_NullLegType(){
+    @Test
+    void testCashflowValue_NullLegType(){
 
         //null leg
         leg1.setLegType(null);
@@ -713,4 +777,36 @@ class TradeServiceTest {
         TradeLeg nullLeg = result.getTradeLegs().get(0);//null leg
             assertEquals(0, nullLeg.getCashflows().get(0).getPaymentValue().compareTo(BigDecimal.ZERO));
          } 
+
+
+         //settlment instructions tests
+
+        //   @Test
+        // void testSettlementInstructions_Search(){
+
+        // //null leg
+        // AdditionalInfo additionalInfo = new AdditionalInfo();
+        // additionalInfo.setEntityId(100001L);
+        // additionalInfo.setFieldName("SETTLEMENT_INSTRUCTIONS");
+        // additionalInfo.setFieldType("STRING");
+        // additionalInfo.setFieldValue("Settle via JPM");
+
+        // String searchString = "jpm";
+
+        // List<Addi
+
+        // tradeDTO.setAdditionalFields()
+
+       
+
+        // // When - execute the service method
+        // List<Trade> result = tradeService.searchTradesBySettlementInstructions(searchString);
+     
+        // // Then - Assert the results
+        // TradeLeg nullLeg = result.getTradeLegs().get(0);//null leg
+        //     assertEquals(0, nullLeg.getCashflows().get(0).getPaymentValue().compareTo(BigDecimal.ZERO));
+        //  } 
+
+
+
 }

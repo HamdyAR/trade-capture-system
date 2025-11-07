@@ -1,6 +1,8 @@
-# Step 2 Test Fix Documentation
+# Project Documentation
+This documentation outlines the technical decisions, design considerations, thought process and key learnings from all stages of this project.
 
-## Overview
+## Step 2 Test Fix Documentation
+### Overview
 This is a comprehensive documentation of all the failing backend tests that were identified after setting up and running the project successfully. In this documentation, each test case will be analyzed based on the following criteria: 
 - **Problem Description**
 - **Root Cause Analysis**
@@ -9,13 +11,13 @@ This is a comprehensive documentation of all the failing backend tests that were
 
 The aim of this documentation is to provide a clear understanding of the causes of test failures and errors, the reasoning behind each fix, and the verification process that ensures that all the issues were properly resolved.
 
-## Summary of Test Results
+### Summary of Test Results
 After running `mvn clean install`, a total of **11 failing test cases** were identified. These test cases are grouped into two main categories:
 - **Failures**: Tests that executed but failed due to incorrect logic (9 total).
 - **Errors**: Tests that could not execute successfully due to thrown exceptions (2 total).
 
 
-## Test Failures
+### Test Failures
 This section documents all **9** test failures and how each was fixed.
 ### 1. TradeControllerTest
 **Total Failures: 6**
@@ -51,11 +53,11 @@ In Spring Boot, required fields should be annotated with validation annotations 
 The `bookName` field in `TradeDTO.java` (around line **47**) did not have a `@NotNull` annotation. As a result, Spring Boot did not perform validation on this field, and the controller proceeded to create the trade without verifying the book data, returning `201 Created` instead of the expected `400 Bad Request` indicating invalid request data.
 
 To correct this, a manual validation check was added inside `createTrade()` to ensure both `bookName` and `counterpartyName` are provided. This correctly triggered the `400 Bad Request` response. 
-However, another issue arose because Spring's default validation (`@Valid`) intercepted the request before this manual validation, throwing a `MethodArgumentNotValidException`. Since this exception was not explicitly handled, the returned body response was empty instead of displaying the expected errror message `"Book and Counterparty are required"`.This required explicit exception handling to ensure that the custom message was returned to the client.   
+However, another issue arose because Spring's default validation (`@Valid`) intercepted the request before this manual validation, throwing a `MethodArgumentNotValidException`. Since this exception was not explicitly handled, the returned body response was empty instead of displaying the expected error message `"Book and Counterparty are required"`.This required explicit exception handling to ensure that the custom message was returned to the client.   
 
 
 - **Solution Implemented:**
-A global exception handler was implemented using the `ControllerAdvice` and `ExceptionHandler(MethodArgumentNotValidException.class)` annotations to catch validation errors amd return meaningful error messages. This ensures that the custom message, `"Book and Counterparty are required"` is returned whenever either the `bookName` or `counterpartyName` fields is missing from the trade request. 
+A global exception handler was implemented using the `ControllerAdvice` and `ExceptionHandler(MethodArgumentNotValidException.class)` annotations to catch validation errors and return meaningful error messages. This ensures that the custom message, `"Book and Counterparty are required"` is returned whenever either the `bookName` or `counterpartyName` fields is missing from the trade request. 
 
 - **Verification:**
 The test was rerun using the command: 
@@ -70,7 +72,6 @@ which confirmed the fix. The total test failures reduced from 8 to 7, and `testC
 
 However, the stricter validation introduced by this fix generated additional issues in other test cases(`BookServiceTest` and `TradeServiceTest`), which were previously masked by the missing validation. These new errors will be analyzed and addressed in subsequent fixes.
 
-
 #### iii. `testDeleteTrade`
 - **Problem Description:**
 The `testDeleteTrade` test in `TradeControllerTest.java` failed because it expected a `204 No Content` response, but the endpoint returned `200 OK` after successfully deleting a trade.
@@ -80,7 +81,6 @@ According to REST API best practices, a successful resource deletion typically r
 However, in this project, the `deleteTrade()` method in `TradeController.java` is intentionally designed to return a message body for frontend display purposes. This makes the use of `200 OK` more appropriate, as it allows a confirmation message to be sent in the response.
 The test, however, was still expecting `204 No Content`, creating a logical mismatch between the test expectation and the controller's behaviour.
 Additionally, the response message `"Trade cancelled successfully"` was misleading, as the actual operation being performed is a deletion, not cancellation.
-
 
 - **Solution Implemented:**
 The expected status on line **223** in the test was updated from `.andExpect(status().isNoContent())` to `.andExpect(status().isOk())` to reflect the actual API behaviour. The controller's response message was updated from `ResponseEntity.ok().body("Trade cancelled successfully")` to  
@@ -97,7 +97,6 @@ and it passed successfully. Subsequently, a full build was executed with the com
 mvn clean install
 ``` 
 which confirmed the fix. The total test failures reduced from 7 to 6, and `testDeleteTrade` was no longer listed among the failed tests.
-
 
 
 #### iv. `testCreateTradeValidationFailure_MissingTradeDate`
@@ -128,10 +127,9 @@ which confirmed the fix. The total test failures reduced from 6 to 5, and `testC
 The `testUpdateTrade` test in `TradeControllerTest.java` failed because it expected a `tradeId` in the JSON response after updating a trade, but the response body did not contain it.
 
 - **Root Cause Analysis:**
-The `updateTrade()` method in `TradeController.java` was calling `amendTrade()` directly, while the service layer had introduced a new method, `saveTrade()` for controller compatitbility. This `saveTrade()` method internally determines whether to call `createTrade()` or `amendTrade()` based on the presence of a trade ID.
+The `updateTrade()` method in `TradeController.java` was calling `amendTrade()` directly, while the service layer had introduced a new method, `saveTrade()` for controller compatibility. This `saveTrade()` method internally determines whether to call `createTrade()` or `amendTrade()` based on the presence of a trade ID.
 This caused a logical mismatch between the controller and the test where the test was mocking `saveTrade()`, but the controller was invoking `amendTrade()` directly. 
 As a result, the expected `tradeId` was not returned, since the mocked method did not align with the controller's actual behaviour.
-
 
 - **Solution Implemented:**
 The `updateTrade()` method in `TradeController.java` was refactored to call `saveTrade()` instead of `amendTrade()` to maintain controller-service consistency. 
@@ -145,7 +143,6 @@ This ensures that both the controller and test follow the same execution flow de
             Trade savedTrade = tradeService.saveTrade(trade, tradeDTO);
   ```
 This change ensures that the mocked service behaviour in the test aligns with the actual controller flow and that the correct JSON response containing the `tradeId` is returned. 
-
 
 - **Verification:**
 The fix was confirmed by rerunning the previously failing test using: 
@@ -222,7 +219,7 @@ These dependencies were not mocked in the original test, and the trade was never
 ```
 Runtime Exception: Book not found or not set
 ```
-Additionally, the cashflow generation logic did not attach genrated cashflows to the trade legs,leaving the test logically incomplete and causing null pointer exceptions in assertions.
+Additionally, the cashflow generation logic did not attach generated cashflows to the trade legs,leaving the test logically incomplete and causing null pointer exceptions in assertions.
 - **Solution Implemented:**
 The `testCashflowGeneration_MonthlySchedule` test was fully implemented and refactored, and the service logic was slightly enhaced to make it testable:
 - 1. **Test Changes:**
@@ -287,7 +284,7 @@ mvn clean install
 The total test failure count reduced from 1 to 0 indicating that all the test failures have been resolved successfully including `testCreateTrade_InvalidDates_ShouldFail`.
 
 
-## Errors
+### Errors
 This section documents all **2** test errors identified from running the first build, and **3** test errors that arose after fixing some test failures earlier, and how each was fixed.
 **Total errors: 5**
 ### 1. BookServiceTest
@@ -484,28 +481,138 @@ This marks the successful completion of Step 2 of the project. All test failures
 
 
 
-
-
-
 ## Step 3 (Implement Missing Functionality) Documentation
-This documentation covers the design considerations that were adopted to execute the tasks under step 3. It covers the reasoning behind each approach taken to solve the problems.
+
+### Overview
+This documentation highlights the technical decisions and design considerations that were adopted in implementing the enhancements stated in step 3.
 
 ### Enhancement 1: Advanced Trade Search 
-The implementation of the advanced trade search aims to 
+The implementation of the **Advanced Trade Search** aims to improve the user experience for traders by enabling efficient and flexible trade retrieval. This enhancement direcly addresses the business requirement to allow traders to quickly find trades using the multiple search criteria.
+
+#### Implementation Details
+The following REST endpoints were implemented to support multi-search, paginated and advanced query searches:
+
+- `@GetMapping("/search")`: 
+Provides the multi-search criteria functionality using parameters such as  **counterparty**, **book**, **trader**, **status** and **date ranges**.
+
+- `@GetMapping("/filter")`: Enables pagination support for high-volume result sets, allowing traders to navigating through trade lists efficiently. 
+
+- `@GetMapping("/rsql")`: Provides advanced search capabilities using **RSQL (RESTful Service Query Language)** for power users who require complex and dynamic querying.
+
+### Technical Approach
+
+#### Design Decisions
+A single endpoint `/search` was implemented with optional query parameters rather than multiple dedicated endpoints. This design was chosen for the following reasons:
+- Extensibility: New search parameters can be added easily without changing the endpoint structure.
+- Maintainability: Reduces repetitive controller and repository code.
+- REST Compliance: Keeps the API resource-centric (`trades/search`) rather than action-centric e.g. (`/searchByCounterparty`, `searchByBook` etc).
+
+A single endpoint `/filter` was implemented to support high-volume trade retrieval. Pagination was adopted to this effect with the use of the `Pageable` class.
+
+The endpoint `rsql` was used for advanced querying with RSQL. The `RSQLParser` was added to the `pom.xml` file
+
+
+#### Controller Design Considerations
+Two main approaches were evaluated for handling multiple query parameters in `TradeController`:
+- `@RequestParam` - simple for few filters(1-3) but cumbersome with many(4+ filters).
+- `@ModelAttribute` - clean and extensible for multiple optional filters but requires a request DTO class.
+
+#### Decision
+The `@ModelAttribute` was used with a `TradeSearchDTO` as its request class.
+
+#### Justification
+It encapsulates all the search criteria in a single request object resulting in cleaner and more maintainable controller code. It also makes it easy to extend the search endpoint with new parameters as updates will be made only in the `TradeSearchDTO` class and avoids multiple `@RequestParam` definitions.
+
+#### Repository/Service Design Considerations
+Three approaches were evaluated to integrate the multi-search in `TradeRepository`:
+- `Multiple repository methods` - each filter combination will require a method created and for 6 parameters, that would mean about 15 methods.
+- `Spring Data JPA Specification` - it has support for dynamic filtering and pagination
+- `QueryDSL` - it is powerful but complex.
+
+#### Decision
+The `Spring Data JPA Specification` was adopted for dynamic multi criteria searchwith a `TradeSearchDTO` as its request class.
+
+#### Justification
+- It is scalable and maintainable for multiple optional filters
+- It works seamlessly with `Pageable` for pagination
+- It is supported natively in Spring Data(no external dependency required).
+
+
+### Frontend Adjustments
+The following adjustments were made to the frontend to integrate the multi-search endpoint (`/search`):
+ - Added an Advanced search form implemented with a tab design for users to switch seamlessly between basic and advanced search modes. This form was bulit with 6 input fields each for the parameters(Counterparty, Book, Status, Trader, Start Date and End Date) involved where the user can type in the input field of the parameter that they want to search the trades with and hit the search button to call the `/search` API.
+ - Added an RSQL mode toggle for power users to input advanced query strings which enables the calling of the `/rsql` endpoint.
+ - Implemented pagination controls on the trade table for efficient navigation of large datasets which enables the calling of the `/filter` endpoint.
+ 
 
 ### Enhancement 2: Trade Validation Engine
-From my understanding, this enhancement addresses the potential creation of invalid trades i.e. trades that violate the business rules as well as ensures that only authorized users can perform certain operations in the system. The business rules for the trade capture system fall under 4 categories: Trade business rules validation, trade leg rules validation, user privilege validation and entiy and reference data validation. 
+This enhancement ensures that all trades created or amended in the system strictly comply with business and operational rules. It prevents invalid or unauthorized trades from being processed, thereby maintaining dat integrity and regulatory compliance. The validation engine covers four key areas:
+1. Trade Business Rules Validation 
+2. Trade Leg Consistency Validation
+3. User Privilege Validation
+4. Entity and Reference Data Validation
 
-The required implementation include the following validation methods: `validateTradeBusinessRules`, `validateUserPrivileges` and `validateTradeLegConsistency`. Two of these validation methods require the creation of a `ValidationResult` class that should be returned after calling these methods.
+The required validation methods include: 
+```
+public ValidationResult validateTradeBusinessRules(TradeDTO tradeDTO)
+
+public boolean validateUserPrivileges(String userId, String operation, TradeDTO tradeDTO)
+
+public ValidationResult validateTradeLegConsistency(List<TradeLegDTO> legs)
+```
 
 #### ValidationResult Structure 
-Based on the business requirement, the `ValidationResult` was designed to have two fields: 
-- `isValid`, a boolean which states if a trade or trade legs are valid or not where the validity is determined by the trade or trade legs passing the validation checks.
-- `errors`, a list of strings where each string represents a detailed error message reflecting the validation check that failed in the validation method.
+A reusable `ValidationResult` was designed to standardize responses from all validation methods.
 
-The design was done this way to meet expectation of the `ValidationResult` to provide a comprehensive result which will be returned to the client to know what validation has failed and how they can fix it as opposed to displaying one error message at a time which will not be as informative and won't provide a great user experience like having a detailed list of errors. This approach also saves the user time in carrying out trade-related operations like creating, amending, cancelling etc a trade. 
+**Structure**
+- `isValid`: a boolean indicating whether the trade or trade legs passed validation.
+- `errors`: a list of descriptive error messages specifying each validation failure.
+
+**Design Rationale:**
+Returning a comprehensive list of all failed checks improves the user experience and efficiency because users can correct all issues in one step instead of discovering them sequentially. This approach also enhances usability during trade operations such as create, amend, cancel and terminate.
+
+
+#### Authorization Design Considerations
+The system initially lacked any form of user authorization in the backend. To support privilege validation, users needed to be identified via their loginId(used as `userId` in validation method).
+
+
+ The following options were considered to implement authorization: 
+- Request Headers: This involves the client passing the userId which is the loginId as a request header after a user successfully logs into the application.
+- Spring Security: This involvoves the use of Spring Security library to enforce authorization.
+
+#### Decision
+Request Headers was adopted for implementing the authorization.
+
+#### Justification
+The Request Headers approach offers a practical balance between simplicity, compatibility, and future extensibility within the existing system.
+
+It aligns seamlessly with the existing simple username-password authentication mechanism, where users are identified by their loginId.
+
+It allows the frontend interceptor to automatically attach the userId (loginId) in every API request header — enabling consistent backend authorization checks.
+
+It avoids intrusive changes to the existing authentication codebase; authorization logic can be added without reworking existing login functionality.
+
+The design supports future upgrades — if Spring Security is later introduced, the same request header and interceptor setup can be leveraged within the Spring Security filter chain.
+
+Overall, this approach satisfies the current authorization requirement, keeps the codebase stable, and preserves forward compatibility for future security enhancements.
+
+
+
 
 ### Enhancement 3: Trader Dashboard and Blotter System
+The enhancement enables traders to see crucial data and metrics that facilitate theur operations.
+
+#### Implementation Details
+The following REST endpoints were implemented to support multi-search, paginated and advanced query searches:
+
+- `@GetMapping("/my-trades")`: 
+The endpoint serves to display only a trader's trades to ensure proper access control and encapsulation.
+
+- `@GetMapping("/book/{id}/trades")`: Shows all trades for a specific book. 
+
+- `@GetMapping("/summary")`: Shows summary of a trader's trading activity.
+
+- `@GetMapping("/daily-summary")`: Shows summary of today's trading activity with historical comparison.
 
 
 ## Step 4 (Bug Investigation and Fix) Documentation
@@ -517,16 +624,18 @@ The bug identified as `TRD-2025-001` involves a critical error in the cashflow c
 This bug has a high business impact, as it directly affects production trading operations and can lead to incorrect settlements and financial misstatements, particularly in P&L and other related financial reports. Additionally, minor precision issues in the calculation introduce small variations between trades. Prompt resolution is essential to prevent financial exposure and maintain the integrity of trading analytics and risk reporting and financial controls.
 
 ### Technical Investigation
-The debugging process began with a thorough examination of the cashflow calculation logic implemented in the `calculateCashflowValue()` method within `TradeService.java`. Since the issue affected fixed-leg cashflows, the investigation focused primarily on the formual used to derive the interest amount. reviewed to ensure that it is right for calculating the interest amounts which is the simple interest formula, `(Notional × Rate × Months) ÷ 12`. Next, the data type used in each parameter of the formula was checked to verify that it conforms with the standard data type used for monetary calculations. Subsequently, the rate percentage handling was checked to see if the rate percentage was handled by converting to a decimal.
+The debugging process began with a thorough examination of the cashflow calculation logic implemented in the `calculateCashflowValue()` method within `TradeService.java`. Since the issue affected fixed-leg cashflows, the investigation focused primarily on the formula used to derive the interest amount. reviewed to ensure that it is right for calculating the interest amounts which is the simple interest formula, `(Notional × Rate × Months) ÷ 12`. Next, the data type used in each parameter of the formula was checked to verify that it conforms with the standard data type used for monetary calculations. Subsequently, the rate percentage handling was checked to see if the rate percentage was handled by converting to a decimal.
 
 It was discovered that the rate percentage handling was not implemented and some inappropriate data types like `double` were used in the fixed-leg cashflow amount calculation after reviewing the cashflow calculation logic.
 
 #### Debugging Methodology
-- 1. Formula Review
+- 1. Recreation of the error: The fixed-leg scenario that was cited in the problem statement was recreated ($10M trade at a 3.5% rate generating ~$875,000) to verify if the result is true. I created a test for the `cashflowValue()` method and the result generated was `8,750,000` instead of the `875,000` mentioned in the problem statement.
+
+- 2. Formula Review
 The formula used for calculating fixed-leg cashflows, `(Notional * Rate * Months) ÷ 12`, was reviewed to confirm its correctness for computing simple interest.
-- 2. Data Type Validation
+- 3. Data Type Validation
 Each variable used in the calculation `(notional, rate, and months)` was checked to ensure appropriate data types were being used, particularly for monetary calculations where precision is critical.
-- 3. Rate Percentage Handling Check
+- 4. Rate Percentage Handling Check
 A further review was made to how the interest rate was being processed, specifically whether the rate (expressed as a percentage e.g. 3.5%) was correctly converted into decimal form(0.035) before being applied in the calculation.
 
 #### Findings
@@ -554,12 +663,50 @@ The following bugs were identified after a thorough technical investigation:
 
 - 3. **Lack of Validation and Testing**
 - **Description**
-The absence of validation checks and unit test for the `calculateCahsflowValue()` allowed the incorrect rate percentage handling and data type usage to go undetected.
+The absence of validation checks and unit test for the `calculateCashflowValue()` allowed the incorrect rate percentage handling and data type usage to go undetected.
 - **Why It Occurred**
 The test coverage likely focused on functional corretcness (the method runs without errors) rather than verifying financail accuracy and consistency across different rate ans notional scenarios.
 
 ### Proposed Solution
+The simple interest formula was refactored accordingly to make use of the approrpriate data type, `double` for every variable in the `calculateCashflowValue()` method to prevent floating-point errors and inflated cashflow values were prevented by implementing proper rate handling by dividing by 100.
+
+The fix was verified using the `testCashflowValue_QuarterlySchedule` method which correctly generated a value of 87500.00 for a $10M trade at a 3.5% rate. Other schedules(e.g. monthly, yearly etc) were tested successfully.
 
 
 ## Step 5 (Full-Stack Feature Implementation) Documentation
 This documentation covers the design considerations and justifications applied while implementing the settlement instructions feature on the backend and frontend side of the application.
+
+### Design Considerations
+
+#### Additional Info vs Direct Table
+The additional info extensibility and direct table adjsutment options were presented to implement the settlement instructions feature.
+
+**Decision**
+I adopted the additional info method to implement settlement instructions.
+
+- **Justification**
+Fully extensible — supports future settlement-related attributes.
+
+No schema changes required (uses existing AdditionalInfo structure).
+
+Follows enterprise-grade design patterns used in scalable trade systems.
+
+Enables reuse of existing AdditionalInfo service/repository logic
+
+
+**Data Validation**
+The annotations @NotNull, @Size, and @Pattern were used to enforce the data validation rules regarding 10–500 characters and unsafe/special characters.
+
+
+**Frontend Integration Requirements**
+Trade Booking Form Enhancement
+
+- Added a Settlement Instructions input field in the Trade Booking Modal.
+
+- Displayed settlement instructions in the trade detail view.
+
+- Added a “Settlement Instructions” column to the trade blotter/grid.
+
+
+
+

@@ -23,14 +23,8 @@ public class GlobalExceptionHandler {
             return ResponseEntity.badRequest().body("Book and Counterparty are required");
         }
 
-        Map<String, String> errors = new HashMap<>();
-        ex.getBindingResult().getAllErrors().forEach((error) -> {
-            errors.put("error", "Bad Request");
-            String errorMessage = error.getDefaultMessage();
-            errors.put("message", errorMessage);
-            errors.put("timestamp", LocalDateTime.now().toString());
-        });
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
+        String firstError = ex.getBindingResult().getAllErrors().get(0).getDefaultMessage();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(firstError);
     }
   
 

@@ -9,6 +9,6 @@ import java.util.Optional;
 @Repository
 public interface ApplicationUserRepository extends JpaRepository<ApplicationUser, Long> {
     // Custom query methods if needed
-    Optional<ApplicationUser> findByLoginId(String loginId);
-    Optional<ApplicationUser> findByFirstName(String firstName);
+    Optional<ApplicationUser> findByLoginIdIgnoreCase(String loginId);
+    Optional<ApplicationUser> findByFirstNameIgnoreCase(String firstName);
 }

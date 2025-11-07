@@ -14,6 +14,7 @@ export function getColDefFromResult(data: unknown): unknown[] {
                 width: 90
             };
         }
+        
         return {
             headerName: key.charAt(0).toUpperCase() + key.slice(1),
             field: key,
@@ -36,9 +37,11 @@ export function getRowDataFromData(data: unknown): unknown[] {
                 activeValue = false;
             }
         }
+
+
         return {
             ...row,
-            active: activeValue
+            active: activeValue,
         };
     });
 }
